@@ -6,12 +6,4 @@
         <Nullable>enable</Nullable>
     </PropertyGroup>
 
-    <ItemGroup>
-      <Folder Include="Board\" />
-      <Folder Include="Eval\" />
-      <Folder Include="MoveGen\" />
-      <Folder Include="Moves\" />
-      <Folder Include="Notation\" />
-    </ItemGroup>
-
 </Project>
