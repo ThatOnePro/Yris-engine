@@ -1,3 +1,5 @@
+using Engine.Core.Moves;
+
 namespace Engine.Core.Board;
 
 public sealed class Position
@@ -35,6 +37,64 @@ public sealed class Position
         position.SideToMove = Color.White;
         return position;
     }
+    
+    //TODO: Speciale moves nog verder afwerken, castling rechten weghalen wanneer een castle piece moved, en passant implementeren, promotie implementeren, promotie handling afmaken
+    public void MakeMove(Move move)
+    {
+        var movingPiece = Squares[move.From];
+        var capturedPiece = Squares[move.To]; // belangerijk om te onthouden elke move is een capture want een leeg veld is een piece called "None"
+
+        _history.Push(new UndoState(
+            capturedPiece,
+            EnPassantSquare,
+            Castling,
+            HalfmoveClock,
+            FullmoveNumber
+        ));
+
+        Squares[move.To] = move.Promotion != Piece.None
+            ? move.Promotion
+            : movingPiece;
+
+        Squares[move.From] = Piece.None;
+
+        EnPassantSquare = -1;
+
+        if (movingPiece == Piece.WP || movingPiece == Piece.BP || capturedPiece != Piece.None)
+            HalfmoveClock = 0;
+        else
+            HalfmoveClock++;
+
+        if (SideToMove == Color.Black)
+            FullmoveNumber++;
+
+        SideToMove = SideToMove.Opposite();
+    }
+
+    
+    public void UndoMove(Move move)
+    {
+        var undo = _history.Pop();
+
+        SideToMove = SideToMove.Opposite();
+
+        if (SideToMove == Color.Black)
+            FullmoveNumber--;
+
+        var movingPiece = Squares[move.To];
+
+        Squares[move.From] = move.Promotion != Piece.None
+            ? (SideToMove == Color.White ? Piece.WP : Piece.BP)
+            : movingPiece;
+
+        Squares[move.To] = undo.Captured;
+
+        EnPassantSquare = undo.EnPassantSquare;
+        Castling = undo.CastlingRights;
+        HalfmoveClock = undo.HalfMoveClock;
+        FullmoveNumber = undo.FullMoveNumber;
+    }
+
     
 
 
