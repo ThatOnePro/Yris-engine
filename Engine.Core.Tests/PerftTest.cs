@@ -1,4 +1,7 @@
-﻿namespace Engine.Core.Tests;
+﻿using Engine.Core.Board;
+using Engine.Core.Moves;
+
+namespace Engine.Core.Tests;
 
 public class PerftTest
 {
