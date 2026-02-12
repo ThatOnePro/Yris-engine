@@ -15,7 +15,7 @@ public class BasicTests
         var move = new Move(12, 28); // e2 to e4
 
         pos.MakeMove(move);
-        pos.UndoMove(move);
+        pos.UndoMove();
 
         Assert.Equal(original, pos.Squares);
     }

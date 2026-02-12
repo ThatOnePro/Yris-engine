@@ -45,6 +45,7 @@ public sealed class Position
         var capturedPiece = Squares[move.To]; // belangerijk om te onthouden elke move is een capture want een leeg veld is een piece called "None"
 
         _history.Push(new UndoState(
+            move,
             capturedPiece,
             EnPassantSquare,
             Castling,
@@ -72,10 +73,11 @@ public sealed class Position
     }
 
     
-    public void UndoMove(Move move)
+    public void UndoMove()
     {
         var undo = _history.Pop();
-
+        var move = undo.Move;
+        
         SideToMove = SideToMove.Opposite();
 
         if (SideToMove == Color.Black)
