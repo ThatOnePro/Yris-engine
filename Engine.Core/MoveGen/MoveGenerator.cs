@@ -70,7 +70,6 @@ public static class MoveGenerator
             int toFile = to % 8;
             int toRank = to / 8;
 
-            // prevents wrap-around
             if (Math.Abs(fromFile - toFile) > 2 || Math.Abs(fromRank - toRank) > 2) continue;
 
             var target = pos.Squares[to];
@@ -93,7 +92,6 @@ public static class MoveGenerator
         {
             moves.Add(new Move(from, one));
 
-            // double
             if (fromRank == startRank)
             {
                 int two = from + 2 * dir;
@@ -102,7 +100,6 @@ public static class MoveGenerator
             }
         }
 
-        // captures
         int[] caps = white ? new[] { 7, 9 } : new[] { -7, -9 };
         foreach (var o in caps)
         {
@@ -110,7 +107,7 @@ public static class MoveGenerator
             if (to < 0 || to >= 64) continue;
 
             int toFile = to % 8;
-            if (Math.Abs(fromFile - toFile) != 1) continue; // edge wrap protection
+            if (Math.Abs(fromFile - toFile) != 1) continue; 
 
             var target = pos.Squares[to];
             if (target != Piece.None && ((white && target.IsBlack()) || (!white && target.IsWhite())))
@@ -138,11 +135,9 @@ public static class MoveGenerator
 
                 int nextFile = next % 8;
 
-                // prevent horizontal wrap (important!)
                 if (Math.Abs(nextFile - (to % 8)) > 1 && (dir == -1 || dir == 1))
                     break;
 
-                // prevent diagonal wrap
                 if ((dir == -9 || dir == 7) && nextFile > (to % 8))
                     break;
 
@@ -160,7 +155,7 @@ public static class MoveGenerator
                     if ((white && target.IsBlack()) || (!white && target.IsWhite()))
                         moves.Add(new Move(from, next));
 
-                    break; // blocked
+                    break; 
                 }
 
                 to = next;
@@ -189,7 +184,7 @@ public static class MoveGenerator
             int toFile = to % 8;
 
             if (Math.Abs(fromFile - toFile) > 1)
-                continue; // wrap protection
+                continue;
 
             var target = pos.Squares[to];
 
@@ -201,6 +196,5 @@ public static class MoveGenerator
             }
         }
 
-        // Castling will be added later
     }
 }
