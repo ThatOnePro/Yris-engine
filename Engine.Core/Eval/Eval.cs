@@ -1,16 +1,16 @@
 using Engine.Core.Board;
 
-public class Evaluation()
+public static class Eval
 {
-    private int queenWt = 9;
-    private int rookWt = 5;
-    private int bishopWt = 3;
-    private int knightWt = 3;
-    private int pawnWt = 1;
-    private double doubledIsolatedWt = -0.5;
+    private static int queenWt = 9;
+    private static int rookWt = 5;
+    private static int bishopWt = 3;
+    private static int knightWt = 3;
+    private static int pawnWt = 1;
+    private static double doubledIsolatedWt = -0.5;
 
 
-    public int FindDoubledPawns(Position position, char colour)
+    public static int FindDoubledPawns(Position position, char colour)
     {
         int counter = 0;
         for (int i = 0; i < 8; i++)
@@ -34,7 +34,7 @@ public class Evaluation()
     
     
 
-    public double MaterialScore(Position position) // isolated pawns and development(amount of legal moves) still need to be added.
+    public static double MaterialScore(Position position) // isolated pawns and development(amount of legal moves) still need to be added.
     {
         double score = queenWt * (position.Squares.Count(s => s == Piece.WQ) - position.Squares.Count(s => s == Piece.BQ));
         score += rookWt * (position.Squares.Count(s => s == Piece.WR) - position.Squares.Count(s => s == Piece.BR));
