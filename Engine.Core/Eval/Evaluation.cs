@@ -31,6 +31,8 @@ public class Evaluation()
         }
         return counter;
     }
+    
+    
 
     public double MaterialScore(Position position) // isolated pawns and development(amount of legal moves) still need to be added.
     {
