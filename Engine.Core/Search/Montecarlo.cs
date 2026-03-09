@@ -8,7 +8,6 @@ public class Montecarlo
 {
     private Position pos;
     private List<Move> moves;
-    private Color color;
 
     public Position Pos
     {
@@ -22,20 +21,12 @@ public class Montecarlo
         set => moves = MoveGenerator.GeneratePseudoLegalMoves(Pos);
     }
 
-    public Color Color
-    {
-        get => color;
-        set => color = value;
-    }
-
-    public Montecarlo(Position pos, Color color)
+    public Montecarlo(Position pos)
     {
         this.pos = pos;
-        this.color = color;
     }
-
-
-    public Move findBestMove()
+    
+    public Move FindBestMove()
     {
         double currentEval = Eval.MaterialScore(pos);
         Move bestMove = new Move();
@@ -52,4 +43,10 @@ public class Montecarlo
         }
         return bestMove;
     }
+
+    
+    
+    
+    
+    
 }
