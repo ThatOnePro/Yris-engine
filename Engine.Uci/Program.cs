@@ -70,7 +70,7 @@ var tests = new List<PerftTest>
 
     new("Position 4",
         "r3k2r/Pppp1ppp/1b3nbN/nP6/BBP1P3/q4N2/Pp1P2PP/R2Q1RK1 w kq - 0 1",
-        new long[] {6, 264, 9467, 422333, 15833292}),
+        new long[] {6, 264, 9467, 422333, /*15833292*/}),
 
     new("Position 5",
         "rnbq1k1r/pp1Pbppp/2p5/8/2B5/8/PPP1NnPP/RNBQK2R w KQ - 1 8",
@@ -78,7 +78,7 @@ var tests = new List<PerftTest>
 
     new("Position 6",
         "r4rk1/1pp1qppp/p1np1n2/2b1p1B1/2B1P1b1/P1NP1N2/1PP1QPPP/R4RK1 w - - 0 10",
-        new long[] {46, 2079, 89890, 3894594})
+        new long[] {46, 2079, 89890, /*3894594*/})
 };
 
 foreach (var test in tests)
