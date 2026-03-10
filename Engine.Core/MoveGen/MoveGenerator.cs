@@ -54,7 +54,7 @@ public static class MoveGenerator
 
         return moves;
     }
-
+    
     private static readonly int[] KnightOffsets = { -17, -15, -10, -6, 6, 10, 15, 17 };
 
     private static void AddKnightMoves(Position pos, int from, Piece piece, List<Move> moves)

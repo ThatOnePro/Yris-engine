@@ -8,7 +8,7 @@ public class Negamax
 {
     private Position pos;
     private List<Move> moves;
-
+    
     public Position Pos
     {
         get => pos;
@@ -26,6 +26,36 @@ public class Negamax
         this.pos = pos;
     }
 
+    public List<ScoredMove> OrderMoves(List<Move> moves)
+    {
+        List<ScoredMove> orderedMoves = new();
+        foreach (var move in moves)
+        {
+            var movingPiece = pos.Squares[move.From];
+            var capturedPiece = pos.Squares[move.To];
+
+            int score = 0;
+
+            // 1. MVV-LVA (Most Valuable Victim - Least Valuable Attacker)
+            if (capturedPiece != 0)
+            {
+                score = 100 * Eval.GetPieceValue(capturedPiece) - Eval.GetPieceValue(movingPiece);
+                score += 10000; // Zorg dat slaan altijd boven stille zetten staat
+            }
+
+            // 2. Promoties zijn ook topprioriteit
+            if (move.Promotion != 0)
+            {
+                score += 5000;
+            }
+
+            orderedMoves.Add(new ScoredMove(move, score));
+        }
+        orderedMoves.Sort((a, b) => b.Score.CompareTo(a.Score));
+        
+        return orderedMoves;
+    }
+    
     public Move GetBestMove(int depth) //houdt rekening met de tegenstander's countermoves en kiest de beste uitkomst
     {
         Move bestMove = new Move();
@@ -59,12 +89,14 @@ public class Negamax
         if (depth == 0) return Eval.MaterialScore(pos);
 
         var moves = MoveGenerator.GeneratePseudoLegalMoves(pos);
+        
+        var orderedMoves = OrderMoves(moves);
 
         double maxEval = double.NegativeInfinity;
 
-        foreach (var move in moves)
+        foreach (var om in orderedMoves)
         {
-            pos.MakeMove(move);
+            pos.MakeMove(om.Move);
             double eval = -NegamaxScore(depth - 1, -beta, -alpha); //alpha en beta zijn elkaars omgekeerde, door ze zo aan te roepen update je beta ook mee.
             pos.UndoMove();
 

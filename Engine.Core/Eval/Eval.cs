@@ -11,6 +11,34 @@ public static class Eval
     private static double doubledIsolatedWt = -0.5;
 
 
+    public static int GetPieceValue(Piece piece)
+    {
+        switch (piece)
+        {
+            case Piece.WN:
+            case Piece.BN:
+                return knightWt;
+            
+            case Piece.WP:
+            case Piece.BP:
+                return pawnWt;
+
+            case Piece.WB:
+            case Piece.BB:
+                return bishopWt;
+
+            case Piece.WR:
+            case Piece.BR:
+                return rookWt;
+
+            case Piece.WQ:
+            case Piece.BQ:
+                return queenWt;
+        }
+        return 0;
+    }
+
+
     public static int FindDoubledPawns(Position position, char colour)
     {
         int counter = 0;
@@ -49,31 +77,31 @@ public static class Eval
 
         score += doubledIsolatedWt * (FindDoubledPawns(position, 'W') - FindDoubledPawns(position, 'B'));
 
-        Position whitePosition = new Position       //niet performant, Axel schuldig verklaard
-                {
-                    Castling = position.Castling,
-                    SideToMove = Color.White,
-                    EnPassantSquare = position.EnPassantSquare,
-                    FullmoveNumber = position.FullmoveNumber,
-                    HalfmoveClock = position.HalfmoveClock
-                };
-        
+        Position whitePosition = new Position //niet performant, Axel schuldig verklaard
+        {
+            Castling = position.Castling,
+            SideToMove = Color.White,
+            EnPassantSquare = position.EnPassantSquare,
+            FullmoveNumber = position.FullmoveNumber,
+            HalfmoveClock = position.HalfmoveClock
+        };
+
         double whiteMoves = MoveGenerator.GeneratePseudoLegalMoves(whitePosition).Count;
-        
-            Position blackPosition = new Position
-            {
-                Castling = position.Castling,
-                SideToMove = Color.Black,
-                EnPassantSquare = position.EnPassantSquare,
-                FullmoveNumber = position.FullmoveNumber,
-                HalfmoveClock = position.HalfmoveClock
-            };
-            
+
+        Position blackPosition = new Position
+        {
+            Castling = position.Castling,
+            SideToMove = Color.Black,
+            EnPassantSquare = position.EnPassantSquare,
+            FullmoveNumber = position.FullmoveNumber,
+            HalfmoveClock = position.HalfmoveClock
+        };
+
         double blackMoves = MoveGenerator.GeneratePseudoLegalMoves(blackPosition).Count;
 
         score = score * (whiteMoves / blackMoves);
-        
-        
+
+
         if (position.SideToMove == Color.Black)
         {
             score = -1 * score;
