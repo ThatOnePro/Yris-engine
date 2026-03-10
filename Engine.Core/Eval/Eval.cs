@@ -3,82 +3,42 @@ using Engine.Core.MoveGen;
 
 public static class Eval
 {
-    private static int queenWt = 9;
-    private static int rookWt = 5;
-    private static int bishopWt = 3;
-    private static int knightWt = 3;
-    private static int pawnWt = 1;
-    private static double doubledIsolatedWt = -0.5;
+    // Use centipawns (integers) for better performance and precision
+    private const int QueenVal = 900;
+    private const int RookVal = 500;
+    private const int BishopVal = 320;
+    private const int KnightVal = 300;
+    private const int PawnVal = 100;
+    private const int MobilityWeight = 5; // 5 centipawns per legal move
 
-
-    public static int FindDoubledPawns(Position position, char colour)
+    public static double MaterialScore(Position position)
     {
-        int counter = 0;
-        for (int i = 0; i < 8; i++)
-        {
-            int pawnsInColumn = 0;
-            for (int j = i; j < 64; j += 8)
-            {
-                if (colour == 'W')
-                {
-                    if (position.Squares[j] == Piece.BP) pawnsInColumn++;
-                }
-                else if (colour == 'B')
-                {
-                    if (position.Squares[j] == Piece.BP) pawnsInColumn++;
-                }
-            }
+        double score = 0;
 
-            if (pawnsInColumn > 1) counter++;
+        // 1. Material Evaluation
+        foreach (var piece in position.Squares)
+        {
+            score += GetPieceValue(piece);
         }
 
-        return counter;
+        // 2. Additive Mobility (instead of multiplicative)
+        // Note: Ideally, pass the move list into Eval to avoid double generation
+        var moves = MoveGenerator.GenerateLegalMoves(position);
+        score += (position.SideToMove == Color.White) 
+            ? moves.Count * MobilityWeight 
+            : -moves.Count * MobilityWeight;
+
+        // 3. Negamax requirement: Return score relative to the moving player
+        return position.SideToMove == Color.White ? score : -score;
     }
 
-
-    public static double
-        MaterialScore(
-            Position position) // isolated pawns and development(amount of legal moves) still need to be added.
+    private static int GetPieceValue(Piece piece) => piece switch
     {
-        double score = queenWt *
-                       (position.Squares.Count(s => s == Piece.WQ) - position.Squares.Count(s => s == Piece.BQ));
-        score += rookWt * (position.Squares.Count(s => s == Piece.WR) - position.Squares.Count(s => s == Piece.BR));
-        score += bishopWt * (position.Squares.Count(s => s == Piece.WB) - position.Squares.Count(s => s == Piece.BB));
-        score += knightWt * (position.Squares.Count(s => s == Piece.WN) - position.Squares.Count(s => s == Piece.BN));
-        score += pawnWt * (position.Squares.Count(s => s == Piece.WP) - position.Squares.Count(s => s == Piece.BP));
-
-        score += doubledIsolatedWt * (FindDoubledPawns(position, 'W') - FindDoubledPawns(position, 'B'));
-
-        Position whitePosition = new Position       //niet performant, Axel schuldig verklaard
-                {
-                    Castling = position.Castling,
-                    SideToMove = Color.White,
-                    EnPassantSquare = position.EnPassantSquare,
-                    FullmoveNumber = position.FullmoveNumber,
-                    HalfmoveClock = position.HalfmoveClock
-                };
-        
-        double whiteMoves = MoveGenerator.GeneratePseudoLegalMoves(whitePosition).Count;
-        
-            Position blackPosition = new Position
-            {
-                Castling = position.Castling,
-                SideToMove = Color.Black,
-                EnPassantSquare = position.EnPassantSquare,
-                FullmoveNumber = position.FullmoveNumber,
-                HalfmoveClock = position.HalfmoveClock
-            };
-            
-        double blackMoves = MoveGenerator.GeneratePseudoLegalMoves(blackPosition).Count;
-
-        score = score * (whiteMoves / blackMoves);
-        
-        
-        if (position.SideToMove == Color.Black)
-        {
-            score = -1 * score;
-        }
-
-        return score;
-    }
+        Piece.WQ => QueenVal, Piece.BQ => -QueenVal,
+        Piece.WR => RookVal,  Piece.BR => -RookVal,
+        Piece.WB => BishopVal, Piece.BB => -BishopVal,
+        Piece.WN => KnightVal, Piece.BN => -KnightVal,
+        Piece.WP => PawnVal,   Piece.BP => -PawnVal,
+        _ => 0
+    };
 }
