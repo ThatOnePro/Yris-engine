@@ -46,8 +46,7 @@ public class Negamax
                 bestValue = boardValue;
                 bestMove = move;
             }
-        
-            // Update alpha (onze beste gegarandeerde score)
+            
             alpha = Math.Max(alpha, boardValue);
         }
 
@@ -66,8 +65,7 @@ public class Negamax
         foreach (var move in moves)
         {
             pos.MakeMove(move);
-            // Recursieve aanroep met omgedraaide alpha/beta en negatief resultaat
-            double eval = -NegamaxScore(depth - 1, -beta, -alpha);
+            double eval = -NegamaxScore(depth - 1, -beta, -alpha); //alpha en beta zijn elkaars omgekeerde, door ze zo aan te roepen update je beta ook mee.
             pos.UndoMove();
 
             maxEval = Math.Max(maxEval, eval);
