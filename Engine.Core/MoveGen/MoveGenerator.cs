@@ -55,6 +55,24 @@ public static class MoveGenerator
         return moves;
     }
     
+    public static List<Move> GenerateLegalMoves(Position pos)
+    {
+        var pseudo = MoveGenerator.GeneratePseudoLegalMoves(pos);
+        var legal = new List<Move>();
+
+        foreach (var move in pseudo)
+        {
+            pos.MakeMove(move);
+
+            if (!AttackDetector.IsKingInCheck(pos, pos.SideToMove.Opposite()))
+                legal.Add(move);
+
+            pos.UndoMove();
+        }
+
+        return legal;
+    }
+
     private static readonly int[] KnightOffsets = { -17, -15, -10, -6, 6, 10, 15, 17 };
 
     private static void AddKnightMoves(Position pos, int from, Piece piece, List<Move> moves)
@@ -83,6 +101,7 @@ public static class MoveGenerator
         bool white = piece.IsWhite();
         int dir = white ? 8 : -8;
         int startRank = white ? 1 : 6;
+        int promotionRank = white ? 6 : 1;
 
         int fromRank = from / 8;
         int fromFile = from % 8;
@@ -90,13 +109,15 @@ public static class MoveGenerator
         int one = from + dir;
         if (one is >= 0 and < 64 && pos.Squares[one] == Piece.None)
         {
-            moves.Add(new Move(from, one));
-
-            if (fromRank == startRank)
+            if (fromRank == promotionRank) AddPromotionMoves(from, one, white, moves);
+            else
             {
-                int two = from + 2 * dir;
-                if (pos.Squares[two] == Piece.None)
-                    moves.Add(new Move(from, two));
+                moves.Add(new Move(from, one));
+                if (fromRank == startRank)
+                {
+                    int two = from + 2 * dir;
+                    if (pos.Squares[two] == Piece.None) moves.Add(new Move(from, two));
+                }
             }
         }
 
@@ -107,14 +128,29 @@ public static class MoveGenerator
             if (to < 0 || to >= 64) continue;
 
             int toFile = to % 8;
-            if (Math.Abs(fromFile - toFile) != 1) continue; 
+            if (Math.Abs(fromFile - toFile) != 1) continue;
 
             var target = pos.Squares[to];
             if (target != Piece.None && ((white && target.IsBlack()) || (!white && target.IsWhite())))
+            {
+                if (fromRank == promotionRank) AddPromotionMoves(from, to, white, moves);
+                else moves.Add(new Move(from, to));
+                continue;
+            }
+
+            if (to == pos.EnPassantSquare)
                 moves.Add(new Move(from, to));
         }
     }
-    
+
+    private static void AddPromotionMoves(int from, int to, bool white, List<Move> moves)
+    {
+        moves.Add(new Move(from, to, white ? Piece.WQ : Piece.BQ));
+        moves.Add(new Move(from, to, white ? Piece.WR : Piece.BR));
+        moves.Add(new Move(from, to, white ? Piece.WB : Piece.BB));
+        moves.Add(new Move(from, to, white ? Piece.WN : Piece.BN));
+    }
+
     private static readonly int[] BishopDirections = { -9, -7, 7, 9 };
     private static readonly int[] RookDirections   = { -8, -1, 1, 8 };
     
@@ -196,5 +232,51 @@ public static class MoveGenerator
             }
         }
 
+        AddCastlingMoves(pos, from, piece, moves);
+    }
+
+    private static void AddCastlingMoves(Position pos, int from, Piece piece, List<Move> moves)
+    {
+        if (piece == Piece.WK && from == 4)
+        {
+            if ((pos.Castling & CastlingRights.WhiteKingSide) != 0 &&
+                pos.Squares[5] == Piece.None && pos.Squares[6] == Piece.None &&
+                !AttackDetector.IsSquareAttacked(pos, 4, Color.Black) &&
+                !AttackDetector.IsSquareAttacked(pos, 5, Color.Black) &&
+                !AttackDetector.IsSquareAttacked(pos, 6, Color.Black))
+            {
+                moves.Add(new Move(4, 6));
+            }
+
+            if ((pos.Castling & CastlingRights.WhiteQueenSide) != 0 &&
+                pos.Squares[1] == Piece.None && pos.Squares[2] == Piece.None && pos.Squares[3] == Piece.None &&
+                !AttackDetector.IsSquareAttacked(pos, 4, Color.Black) &&
+                !AttackDetector.IsSquareAttacked(pos, 3, Color.Black) &&
+                !AttackDetector.IsSquareAttacked(pos, 2, Color.Black))
+            {
+                moves.Add(new Move(4, 2));
+            }
+        }
+
+        if (piece == Piece.BK && from == 60)
+        {
+            if ((pos.Castling & CastlingRights.BlackKingSide) != 0 &&
+                pos.Squares[61] == Piece.None && pos.Squares[62] == Piece.None &&
+                !AttackDetector.IsSquareAttacked(pos, 60, Color.White) &&
+                !AttackDetector.IsSquareAttacked(pos, 61, Color.White) &&
+                !AttackDetector.IsSquareAttacked(pos, 62, Color.White))
+            {
+                moves.Add(new Move(60, 62));
+            }
+
+            if ((pos.Castling & CastlingRights.BlackQueenSide) != 0 &&
+                pos.Squares[57] == Piece.None && pos.Squares[58] == Piece.None && pos.Squares[59] == Piece.None &&
+                !AttackDetector.IsSquareAttacked(pos, 60, Color.White) &&
+                !AttackDetector.IsSquareAttacked(pos, 59, Color.White) &&
+                !AttackDetector.IsSquareAttacked(pos, 58, Color.White))
+            {
+                moves.Add(new Move(60, 58));
+            }
+        }
     }
 }

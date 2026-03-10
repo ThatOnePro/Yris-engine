@@ -9,7 +9,6 @@ public sealed class Position
     
     private readonly Stack<UndoState> _history = new();
 
-    
     public CastlingRights Castling { get; set; } =
         CastlingRights.WhiteKingSide | CastlingRights.WhiteQueenSide |
         CastlingRights.BlackKingSide | CastlingRights.BlackQueenSide;
@@ -42,7 +41,17 @@ public sealed class Position
     public void MakeMove(Move move)
     {
         var movingPiece = Squares[move.From];
-        var capturedPiece = Squares[move.To]; // belangerijk om te onthouden elke move is een capture want een leeg veld is een piece called "None"
+        var capturedPiece = Squares[move.To];
+
+        bool isPawn = movingPiece == Piece.WP || movingPiece == Piece.BP;
+        bool isEnPassantCapture = isPawn && move.To == EnPassantSquare && capturedPiece == Piece.None && (move.From % 8 != move.To % 8);
+        int epCapturedSquare = -1;
+
+        if (isEnPassantCapture)
+        {
+            epCapturedSquare = move.To + (movingPiece == Piece.WP ? -8 : 8);
+            capturedPiece = Squares[epCapturedSquare];
+        }
 
         _history.Push(new UndoState(
             move,
@@ -53,43 +62,79 @@ public sealed class Position
             FullmoveNumber
         ));
 
-        Squares[move.To] = move.Promotion != Piece.None
-            ? move.Promotion
-            : movingPiece;
-
+        Squares[move.To] = move.Promotion != Piece.None ? move.Promotion : movingPiece;
         Squares[move.From] = Piece.None;
+
+        if (isEnPassantCapture)
+            Squares[epCapturedSquare] = Piece.None;
+
+        // castling rook move
+        if (movingPiece == Piece.WK && move.From == 4 && move.To == 6) { Squares[5] = Piece.WR; Squares[7] = Piece.None; }
+        if (movingPiece == Piece.WK && move.From == 4 && move.To == 2) { Squares[3] = Piece.WR; Squares[0] = Piece.None; }
+        if (movingPiece == Piece.BK && move.From == 60 && move.To == 62) { Squares[61] = Piece.BR; Squares[63] = Piece.None; }
+        if (movingPiece == Piece.BK && move.From == 60 && move.To == 58) { Squares[59] = Piece.BR; Squares[56] = Piece.None; }
+
+        // castling rights update on king move
+        if (movingPiece == Piece.WK) Castling &= ~(CastlingRights.WhiteKingSide | CastlingRights.WhiteQueenSide);
+        if (movingPiece == Piece.BK) Castling &= ~(CastlingRights.BlackKingSide | CastlingRights.BlackQueenSide);
+
+        // castling rights update on rook move
+        if (movingPiece == Piece.WR && move.From == 0) Castling &= ~CastlingRights.WhiteQueenSide;
+        if (movingPiece == Piece.WR && move.From == 7) Castling &= ~CastlingRights.WhiteKingSide;
+        if (movingPiece == Piece.BR && move.From == 56) Castling &= ~CastlingRights.BlackQueenSide;
+        if (movingPiece == Piece.BR && move.From == 63) Castling &= ~CastlingRights.BlackKingSide;
+
+        // castling rights update on rook capture
+        if (capturedPiece == Piece.WR && move.To == 0) Castling &= ~CastlingRights.WhiteQueenSide;
+        if (capturedPiece == Piece.WR && move.To == 7) Castling &= ~CastlingRights.WhiteKingSide;
+        if (capturedPiece == Piece.BR && move.To == 56) Castling &= ~CastlingRights.BlackQueenSide;
+        if (capturedPiece == Piece.BR && move.To == 63) Castling &= ~CastlingRights.BlackKingSide;
 
         EnPassantSquare = -1;
 
-        if (movingPiece == Piece.WP || movingPiece == Piece.BP || capturedPiece != Piece.None)
-            HalfmoveClock = 0;
-        else
-            HalfmoveClock++;
+        if (isPawn && Math.Abs(move.To - move.From) == 16)
+            EnPassantSquare = (move.From + move.To) / 2;
 
-        if (SideToMove == Color.Black)
-            FullmoveNumber++;
+        if (isPawn || capturedPiece != Piece.None) HalfmoveClock = 0;
+        else HalfmoveClock++;
 
+        if (SideToMove == Color.Black) FullmoveNumber++;
         SideToMove = SideToMove.Opposite();
     }
 
-    
     public void UndoMove()
     {
         var undo = _history.Pop();
         var move = undo.Move;
         
         SideToMove = SideToMove.Opposite();
-
-        if (SideToMove == Color.Black)
-            FullmoveNumber--;
+        if (SideToMove == Color.Black) FullmoveNumber--;
 
         var movingPiece = Squares[move.To];
+        bool wasPromotion = move.Promotion != Piece.None;
+        bool wasPawnMove = wasPromotion || movingPiece == Piece.WP || movingPiece == Piece.BP;
+        bool wasEnPassantCapture = wasPawnMove && move.To == undo.EnPassantSquare && undo.Captured != Piece.None && (move.From % 8 != move.To % 8);
 
-        Squares[move.From] = move.Promotion != Piece.None
+        Squares[move.From] = wasPromotion
             ? (SideToMove == Color.White ? Piece.WP : Piece.BP)
             : movingPiece;
 
-        Squares[move.To] = undo.Captured;
+        if (wasEnPassantCapture)
+        {
+            Squares[move.To] = Piece.None;
+            int epCapturedSquare = move.To + (SideToMove == Color.White ? -8 : 8);
+            Squares[epCapturedSquare] = undo.Captured;
+        }
+        else
+        {
+            Squares[move.To] = undo.Captured;
+        }
+
+        // undo castling rook move
+        if (Squares[move.From] == Piece.WK && move.From == 4 && move.To == 6) { Squares[7] = Piece.WR; Squares[5] = Piece.None; }
+        if (Squares[move.From] == Piece.WK && move.From == 4 && move.To == 2) { Squares[0] = Piece.WR; Squares[3] = Piece.None; }
+        if (Squares[move.From] == Piece.BK && move.From == 60 && move.To == 62) { Squares[63] = Piece.BR; Squares[61] = Piece.None; }
+        if (Squares[move.From] == Piece.BK && move.From == 60 && move.To == 58) { Squares[56] = Piece.BR; Squares[59] = Piece.None; }
 
         EnPassantSquare = undo.EnPassantSquare;
         Castling = undo.CastlingRights;
