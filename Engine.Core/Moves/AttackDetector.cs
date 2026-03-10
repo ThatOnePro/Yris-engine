@@ -34,11 +34,12 @@ public static class AttackDetector
             int left = square + 7;
             int right = square + 9;
 
+            if (file < 7 && left < 64 && pos.Squares[left] == Piece.BP)
+                return true;
+            
             if (file > 0 && right < 64 && pos.Squares[right] == Piece.BP)
                 return true;
 
-            if (file < 7 && left < 64 && pos.Squares[left] == Piece.BP)
-                return true;
         }
 
         return false;

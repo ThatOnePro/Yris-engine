@@ -45,16 +45,5 @@ public static class Perft
 
         Console.WriteLine($"Total: {total}");
     }
-
-    static string MoveToString(Move move)
-    {
-        return SquareName(move.From) + SquareName(move.To);
-    }
-
-    static string SquareName(int sq)
-    {
-        char file = (char)('a' + (sq % 8));
-        char rank = (char)('1' + (sq / 8));
-        return $"{file}{rank}";
-    }
+    
 }
