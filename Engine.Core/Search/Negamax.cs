@@ -6,27 +6,7 @@ namespace Engine.Core.Search;
 
 public class Negamax
 {
-    private Position pos;
-    private List<Move> moves;
-    
-    public Position Pos
-    {
-        get => pos;
-        set => pos = value;
-    }
-
-    public List<Move> Moves
-    {
-        get => moves;
-        set => moves = MoveGenerator.GeneratePseudoLegalMoves(Pos);
-    }
-
-    public Negamax(Position pos)
-    {
-        this.pos = pos;
-    }
-
-    public List<ScoredMove> OrderMoves(List<Move> moves)
+    public static List<ScoredMove> OrderMoves(Position pos, List<Move> moves)
     {
         List<ScoredMove> orderedMoves = new();
         foreach (var move in moves)
@@ -56,18 +36,19 @@ public class Negamax
         return orderedMoves;
     }
     
-    public Move GetBestMove(int depth) //houdt rekening met de tegenstander's countermoves en kiest de beste uitkomst
+    public static Move GetBestMove(Position pos, int depth) //houdt rekening met de tegenstander's countermoves en kiest de beste uitkomst
     {
         Move bestMove = new Move();
         double bestValue = double.NegativeInfinity;
         double alpha = double.NegativeInfinity;
         double beta = double.PositiveInfinity;
 
-
+        var moves = MoveGenerator.GenerateLegalMoves(pos);
+        
         foreach (var move in moves)
         {
             pos.MakeMove(move);
-            double boardValue = -NegamaxScore(depth - 1, -beta, -alpha);
+            double boardValue = -NegamaxScore(pos, depth - 1, -beta, -alpha);
 
             pos.UndoMove();
             
@@ -83,21 +64,21 @@ public class Negamax
         return bestMove;
     }
 
-    private double NegamaxScore(int depth, double alpha, double beta)
+    private static double NegamaxScore(Position pos, int depth, double alpha, double beta)
     {
         // 1. Basisgeval: diepte bereikt
         if (depth == 0) return Eval.MaterialScore(pos);
 
-        var moves = MoveGenerator.GeneratePseudoLegalMoves(pos);
+        var moves = MoveGenerator.GenerateLegalMoves(pos);
         
-        var orderedMoves = OrderMoves(moves);
+        var orderedMoves = OrderMoves(pos, moves);
 
         double maxEval = double.NegativeInfinity;
 
         foreach (var om in orderedMoves)
         {
             pos.MakeMove(om.Move);
-            double eval = -NegamaxScore(depth - 1, -beta, -alpha); //alpha en beta zijn elkaars omgekeerde, door ze zo aan te roepen update je beta ook mee.
+            double eval = -NegamaxScore(pos, depth - 1, -beta, -alpha); //alpha en beta zijn elkaars omgekeerde, door ze zo aan te roepen update je beta ook mee.
             pos.UndoMove();
 
             maxEval = Math.Max(maxEval, eval);
