@@ -10,6 +10,7 @@ public static class Eval
     private const int KnightVal = 300;
     private const int PawnVal = 100;
     private const int MobilityWeight = 5; // 5 centipawns per legal move
+    
 
     public static double MaterialScore(Position position)
     {
@@ -32,7 +33,7 @@ public static class Eval
         return position.SideToMove == Color.White ? score : -score;
     }
 
-    private static int GetPieceValue(Piece piece) => piece switch
+    public static int GetPieceValue(Piece piece) => piece switch
     {
         Piece.WQ => QueenVal, Piece.BQ => -QueenVal,
         Piece.WR => RookVal,  Piece.BR => -RookVal,
