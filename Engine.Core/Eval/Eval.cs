@@ -33,7 +33,7 @@ public static class Eval
         return position.SideToMove == Color.White ? score : -score;
     }
 
-    private static int GetPieceValue(Piece piece) => piece switch
+    public static int GetPieceValue(Piece piece) => piece switch
     {
         Piece.WQ => QueenVal, Piece.BQ => -QueenVal,
         Piece.WR => RookVal,  Piece.BR => -RookVal,
