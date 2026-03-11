@@ -2,59 +2,82 @@
 using Engine.Core.Moves;
 using Engine.Core.Search;
 
-// // Inital
-// var pos1 = Fen.Parse("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1 \n");
-// // Kiwipete
-// var pos2 = Fen.Parse("r3k2r/pppq1ppp/2n1bn2/3p4/3P4/2N1BN2/PPPQ1PPP/R3K2R w KQkq - 0 1 \n");
-// // 
-// var pos3 = Fen.Parse("8/2p5/3p4/KP5r/1R3p1k/8/4P1P1/8 w - - 0 1 \n");
-// var pos4 = Fen.Parse("r3k2r/Pppp1ppp/1b3nbN/nP6/BBP1P3/q4N2/Pp1P2PP/R2Q1RK1 w kq - 0 1\n");
-// var pos5 = Fen.Parse("rnbq1k1r/pp1Pbppp/2p5/8/2B5/8/PPP1NnPP/RNBQK2R w KQ - 1 8  \n");
-// var pos6 = Fen.Parse("r4rk1/1pp1qppp/p1np1n2/2b1p1B1/2B1P1b1/P1NP1N2/1PP1QPPP/R4RK1 w - - 0 10 \n");
-// Console.WriteLine("Running PERFT, pos 1");
-// Console.WriteLine("Expected: 20, 400, 8902");
-// for (int i = 1; i <= 4; i++){
-//     Console.WriteLine(Perft.Run(pos1, i));
-// }
-//
-// Console.WriteLine("Running PERFT, pos 2");
-// Console.WriteLine("Expected: 48, 2039, 97862");
-// for (int i = 1; i <= 3; i++)
-// {
-//     Console.WriteLine(Perft.Run(pos2, i));
-//
-// }
-//
-// Console.WriteLine("Running PERFT, pos 3");
-// Console.WriteLine("Expected: 14, 191, 2812");
-// for (int i = 1; i <= 3; i++)
-// {
-//     Console.WriteLine(Perft.Run(pos3, i));
-//
-// }
-//
-// Console.WriteLine("Running PERFT, pos 4");
-// Console.WriteLine("Expected: 6, 264, 9467");
-// for (int i = 1; i <= 3; i++)
-// {
-//     Console.WriteLine(Perft.Run(pos4, i)); 
-// }
-//
-// Console.WriteLine("Running PERFT, pos 5");
-// Console.WriteLine("Expected: 44, 1486, 62379");
-// for (int i = 1; i <= 3; i++)
-// {
-//     Console.WriteLine(Perft.Run(pos5, i)); 
-// }
-//
-// Console.WriteLine("Running PERFT, pos 6");
-// Console.WriteLine("Expected: 46, 2079, 89890");
-// for (int i = 1; i <= 3; i++){
-//     Console.WriteLine(Perft.Run(pos6, i));
-// }
+using Engine.Core.Board;
+using Engine.Core.Search;
 
-var move = Negamax.GetBestMove(Fen.Parse("r3k2r/p1ppqpb1/bn2pnp1/3PN3/1p2P3/2N2Q1p/PPPBBPPP/R3K2R w KQkq - 0 1"), 4);
-Console.WriteLine($"{move.ToUci()}");
+Position position = new Position();
+
+while (true)
+{
+    string? command = Console.ReadLine();
+    if (command == null) continue;
+
+    if (command == "uci")
+    {
+        Console.WriteLine("id name MyChessEngine");
+        Console.WriteLine("id author Axel");
+        Console.WriteLine("uciok");
+    }
+
+    else if (command == "isready")
+    {
+        Console.WriteLine("readyok");
+    }
+
+    else if (command.StartsWith("position"))
+    {
+        ParsePosition(command, ref position);
+    }
+
+    else if (command.StartsWith("go"))
+    {
+        var bestMove = Negamax.GetBestMove(position, depth:4);
+
+        Console.WriteLine($"bestmove {bestMove.ToUci()}");
+    }
+
+    else if (command == "quit")
+    {
+        break;
+    }
+}
+
+
+static void ParsePosition(string command, ref Position pos)
+{
+    var parts = command.Split(' ');
+    if (parts.Length < 2) return;
+
+    if (parts[1] == "startpos")
+    {
+        pos = Fen.Parse("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1");
+    }
+    else if (parts[1] == "fen")
+    {
+        // Zoek waar de FEN eindigt (voor het geval er "moves" achter staat)
+        int movesIndex = command.IndexOf(" moves ");
+        string fen;
+
+        if (movesIndex != -1)
+        {
+            // Pak alles tussen "fen " en " moves"
+            fen = command.Substring(13, movesIndex - 13);
+        }
+        else
+        {
+            // Pak alles na "position fen "
+            fen = command.Substring(13);
+        }
+
+        pos = Fen.Parse(fen);
+    }
+    
+    // TODO: Verwerk eventuele zetten die achter "moves" staan
+    // Dit is essentieel voor je engine om de huidige staat bij te houden!
+}
+
+// var move = Negamax.GetBestMove(Fen.Parse("rnbqkbnr/ppp2p1p/3p2p1/4p2Q/2B1P3/3P4/PPP2PPP/RNB1K1NR b KQkq - 0 4"), 4);
+// Console.WriteLine($"{move.ToUci()}");
 
 // var tests = new List<PerftTest>
 // {
@@ -104,7 +127,7 @@ Console.WriteLine($"{move.ToUci()}");
 // }
 //
 // Perft.Divide(Fen.Parse(tests[1].Fen), 3);
-public record PerftTest(string Name, string Fen, long[] Expected);
+// public record PerftTest(string Name, string Fen, long[] Expected);
 
 
 

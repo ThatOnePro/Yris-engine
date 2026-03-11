@@ -18,7 +18,7 @@ public class Montecarlo
     public List<Move> Moves
     {
         get => moves;
-        set => moves = MoveGenerator.GeneratePseudoLegalMoves(Pos);
+        set => moves = MoveGenerator.GenerateLegalMoves(Pos);
     }
 
     public Montecarlo(Position pos)
