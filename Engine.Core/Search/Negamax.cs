@@ -8,6 +8,8 @@ namespace Engine.Core.Search;
 public static class Negamax
 {
     
+    private static TranspositionTable _tt = new TranspositionTable(256);
+    
     public static List<ScoredMove> OrderMoves(Position pos, List<Move> moves)
     {
         List<ScoredMove> orderedMoves = new();
@@ -65,11 +67,48 @@ public static class Negamax
         return bestMove;
     }
     
+    // public Move GetBestMoveParallel(Position pos, int depth)
+    // {
+    //     var moves = MoveGenerator.GenerateLegalMoves(pos);
+    //     var orderedMoves = OrderMoves(pos, moves);
+    //
+    //     // Gebruik een thread-safe container voor de resultaten
+    //     var results = new ConcurrentBag<(Move move, double score)>();
+    //
+    //     Parallel.ForEach(orderedMoves, moveWrap =>
+    //     {
+    //         // ELKE THREAD HEEFT EEN EIGEN KOPIE VAN HET BORD NODIG
+    //         Position threadPos = pos.Clone(); 
+    //     
+    //         threadPos.MakeMove(moveWrap.Move);
+    //         // We starten Negamax op de kopie
+    //         double score = -NegamaxScore(threadPos, depth - 1, double.NegativeInfinity, double.PositiveInfinity);
+    //         threadPos.UndoMove();
+    //
+    //         results.Add((moveWrap.Move, score));
+    //     });
+    //
+    //     // Zoek de beste score uit de verzamelde resultaten
+    //     return results.OrderByDescending(r => r.score).First().move;
+    // }
+
+    
     private static double NegamaxScore(Position pos, int depth, double alpha, double beta)
     {
+        TTEntry? entry = _tt.Lookup(pos.ZobristKey);
+        if (entry.HasValue && entry.Value.Depth >= depth)
+        {
+            if (entry.Value.Flag == HashFlag.Exact) return entry.Value.Value;
+            if (entry.Value.Flag == HashFlag.LowerBound) alpha = Math.Max(alpha, entry.Value.Value);
+            if (entry.Value.Flag == HashFlag.UpperBound) beta = Math.Min(beta, entry.Value.Value);
+        
+            if (alpha >= beta) return entry.Value.Value;
+        }
+        
         if (depth == 0) return Eval.MaterialScore(pos);
 
         var moves = MoveGenerator.GenerateLegalMoves(pos);
+        var orderedMoves = OrderMoves(pos, moves);
 
         double maxEval = double.NegativeInfinity;
 

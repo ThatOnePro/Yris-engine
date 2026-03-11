@@ -8,6 +8,8 @@ public sealed class Position
     public Color SideToMove { get; set; } = Color.White;
     
     private readonly Stack<UndoState> _history = new();
+    
+    public ulong ZobristKey { get; set; } = 0;
 
     public CastlingRights Castling { get; set; } =
         CastlingRights.WhiteKingSide | CastlingRights.WhiteQueenSide |
@@ -42,7 +44,19 @@ public sealed class Position
     {
         var movingPiece = Squares[move.From];
         var capturedPiece = Squares[move.To];
-
+        
+        int color = (int)SideToMove;
+        ZobristKey ^= Zobrist.GetPieceHash(PieceExtensions.GetPieceType(movingPiece), color, move.From);
+        
+        if (capturedPiece != Piece.None)
+        {
+            ZobristKey ^= Zobrist.GetPieceHash(PieceExtensions.GetPieceType(capturedPiece), 1 - color, move.To);
+        }
+        
+        ZobristKey ^= Zobrist.GetPieceHash(PieceExtensions.GetPieceType(movingPiece), color, move.To);
+        ZobristKey ^= Zobrist.SideToMove;
+        
+        
         bool isPawn = movingPiece == Piece.WP || movingPiece == Piece.BP;
         bool isEnPassantCapture = isPawn && move.To == EnPassantSquare && capturedPiece == Piece.None && (move.From % 8 != move.To % 8);
         int epCapturedSquare = -1;
