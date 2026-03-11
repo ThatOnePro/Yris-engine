@@ -1,11 +1,11 @@
 ﻿using Engine.Core.Board;
 using Engine.Core.Moves;
 using Engine.Core.Search;
-
 using Engine.Core.Board;
 using Engine.Core.Search;
 
 Position position = new Position();
+var depth = 4;
 
 while (true)
 {
@@ -14,14 +14,19 @@ while (true)
 
     if (command == "uci")
     {
-        Console.WriteLine("id name MyChessEngine");
-        Console.WriteLine("id author Axel");
+        Console.WriteLine("id name Yris-Engine");
+        Console.WriteLine("id author Axel Peeters, Lars Peleman, Jan Van Herck");
         Console.WriteLine("uciok");
     }
 
     else if (command == "isready")
     {
         Console.WriteLine("readyok");
+    }
+
+    else if (command == "ucinewgame")
+    {
+        position = new Position();
     }
 
     else if (command.StartsWith("position"))
@@ -31,14 +36,27 @@ while (true)
 
     else if (command.StartsWith("go"))
     {
-        var bestMove = Negamax.GetBestMove(position, depth:4);
-
+        var bestMove = Negamax.GetBestMove(position, depth: depth);
         Console.WriteLine($"bestmove {bestMove.ToUci()}");
+    }
+
+    else if (command == "stop")
+    {
+        // ignore for now
     }
 
     else if (command == "quit")
     {
         break;
+    }
+
+    else if (command.StartsWith("depth"))
+    {
+        var parts = command.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+        if (parts.Length >= 2 && int.TryParse(parts[1], out var newDepth) && newDepth > 0)
+        {
+            depth = newDepth;
+        }
     }
 }
 
@@ -48,32 +66,30 @@ static void ParsePosition(string command, ref Position pos)
     var parts = command.Split(' ');
     if (parts.Length < 2) return;
 
-    if (parts[1] == "startpos")
+    int index = 1;
+
+    if (parts[index] == "startpos")
     {
         pos = Fen.Parse("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1");
+        index++;
     }
-    else if (parts[1] == "fen")
+    else if (parts[index] == "fen")
     {
-        // Zoek waar de FEN eindigt (voor het geval er "moves" achter staat)
-        int movesIndex = command.IndexOf(" moves ");
-        string fen;
-
-        if (movesIndex != -1)
-        {
-            // Pak alles tussen "fen " en " moves"
-            fen = command.Substring(13, movesIndex - 13);
-        }
-        else
-        {
-            // Pak alles na "position fen "
-            fen = command.Substring(13);
-        }
-
+        string fen = string.Join(" ", parts.Skip(index + 1).Take(6));
         pos = Fen.Parse(fen);
+        index += 7;
     }
-    
-    // TODO: Verwerk eventuele zetten die achter "moves" staan
-    // Dit is essentieel voor je engine om de huidige staat bij te houden!
+
+    if (index < parts.Length && parts[index] == "moves")
+    {
+        index++;
+
+        for (int i = index; i < parts.Length; i++)
+        {
+            Move move = MoveParser.FromUci(pos, parts[i]);
+            pos.MakeMove(move);
+        }
+    }
 }
 
 // var move = Negamax.GetBestMove(Fen.Parse("rnbqkbnr/ppp2p1p/3p2p1/4p2Q/2B1P3/3P4/PPP2PPP/RNB1K1NR b KQkq - 0 4"), 4);
@@ -128,6 +144,3 @@ static void ParsePosition(string command, ref Position pos)
 //
 // Perft.Divide(Fen.Parse(tests[1].Fen), 3);
 // public record PerftTest(string Name, string Fen, long[] Expected);
-
-
-
