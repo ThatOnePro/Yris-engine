@@ -36,34 +36,43 @@ public class Negamax
         return orderedMoves;
     }
     
-    public static Move GetBestMove(Position pos, int depth) //houdt rekening met de tegenstander's countermoves en kiest de beste uitkomst
+    public static Move GetBestMove(Position pos, int depth)
     {
-        Move bestMove = new Move();
+        Move bestMove = default;
         double bestValue = double.NegativeInfinity;
         double alpha = double.NegativeInfinity;
         double beta = double.PositiveInfinity;
 
         var moves = MoveGenerator.GenerateLegalMoves(pos);
-        
-        foreach (var move in moves)
+    
+        // Voeg Move Ordering toe aan de eerste laag
+        var orderedMoves = OrderMoves(pos, moves);
+    
+        // Fallback voor als er geen zetten zijn (schaakmat/pat)
+        if (orderedMoves.Count == 0) return default;
+
+        foreach (var om in orderedMoves)
         {
-            pos.MakeMove(move);
+            pos.MakeMove(om.Move);
+        
+            // Let op: we roepen de score-functie aan voor de rest van de boom
             double boardValue = -NegamaxScore(pos, depth - 1, -beta, -alpha);
 
             pos.UndoMove();
-            
+        
             if (boardValue > bestValue)
             {
                 bestValue = boardValue;
-                bestMove = move;
+                bestMove = om.Move;
             }
-            
+        
+            // Alpha updaten zodat de volgende takken in deze laag 
+            // weten wat de huidige standaard is
             alpha = Math.Max(alpha, boardValue);
         }
 
         return bestMove;
     }
-
     private static double NegamaxScore(Position pos, int depth, double alpha, double beta)
     {
         // 1. Basisgeval: diepte bereikt
