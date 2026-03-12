@@ -76,30 +76,30 @@ public static class Negamax
     }
 
     
-    // public Move GetBestMoveParallel(Position pos, int depth)
-    // {
-    //     var moves = MoveGenerator.GenerateLegalMoves(pos);
-    //     var orderedMoves = OrderMoves(pos, moves);
-    //
-    //     // Gebruik een thread-safe container voor de resultaten
-    //     var results = new ConcurrentBag<(Move move, double score)>();
-    //
-    //     Parallel.ForEach(orderedMoves, moveWrap =>
-    //     {
-    //         // ELKE THREAD HEEFT EEN EIGEN KOPIE VAN HET BORD NODIG
-    //         Position threadPos = pos.Clone(); 
-    //     
-    //         threadPos.MakeMove(moveWrap.Move);
-    //         // We starten Negamax op de kopie
-    //         double score = -NegamaxScore(threadPos, depth - 1, double.NegativeInfinity, double.PositiveInfinity);
-    //         threadPos.UndoMove();
-    //
-    //         results.Add((moveWrap.Move, score));
-    //     });
-    //
-    //     // Zoek de beste score uit de verzamelde resultaten
-    //     return results.OrderByDescending(r => r.score).First().move;
-    // }
+    public static Move GetBestMoveParallel(Position pos, int depth)
+    {
+        var moves = MoveGenerator.GenerateLegalMoves(pos);
+        var orderedMoves = OrderMoves(pos, moves);
+    
+        // Gebruik een thread-safe container voor de resultaten
+        var results = new ConcurrentBag<(Move move, double score)>();
+    
+        Parallel.ForEach(orderedMoves, moveWrap =>
+        {
+            // ELKE THREAD HEEFT EEN EIGEN KOPIE VAN HET BORD NODIG
+            Position threadPos = pos.Clone(); 
+        
+            threadPos.MakeMove(moveWrap.Move);
+            // We starten Negamax op de kopie
+            double score = -NegamaxScore(threadPos, depth - 1, Convert.ToInt32(double.NegativeInfinity), Convert.ToInt32(double.PositiveInfinity), 1);
+            threadPos.UndoMove();
+    
+            results.Add((moveWrap.Move, score));
+        });
+    
+        // Zoek de beste score uit de verzamelde resultaten
+        return results.OrderByDescending(r => r.score).First().move;
+    }
 
     
     private static int NegamaxScore(Position pos, int depth, int alpha, int beta, int ply)

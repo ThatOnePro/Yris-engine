@@ -4,7 +4,7 @@ namespace Engine.Core.Board;
 
 public sealed class Position
 {
-    public Piece[] Squares { get; } = new Piece[64];
+    public Piece[] Squares { get; set; } = new Piece[64];
     public Color SideToMove { get; set; } = Color.White;
     
     private readonly Stack<UndoState> _history = new();
@@ -156,7 +156,21 @@ public sealed class Position
         FullmoveNumber = undo.FullMoveNumber;
     }
 
-    
+    public Position Clone()
+    {
+        return new Position
+        {
+            // Belangrijk: Maak een NIEUWE array en kopieer de inhoud
+            // Gebruik Array.Copy of .ToArray() voor snelheid
+            Squares = (Piece[])this.Squares.Clone(),
+            
+            // Value types (int, enum, ulong) worden automatisch gekopieerd
+            SideToMove = this.SideToMove,
+            Castling = this.Castling,
+            EnPassantSquare = this.EnPassantSquare,
+            ZobristKey = this.ZobristKey
+        };
+    }
 
 
 } 
