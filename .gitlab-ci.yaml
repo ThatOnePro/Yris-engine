@@ -1,0 +1,59 @@
+﻿stages:
+  - build
+  - release
+
+variables:
+  # This extracts the version number from the tag (e.g., v1.0.3 -> 1.0.3)
+  CLEAN_VERSION: $CI_COMMIT_TAG
+
+.publish_template:
+  stage: build
+  image: mcr.microsoft.com/dotnet/sdk:8.0
+  rules:
+    - if: $CI_COMMIT_TAG =~ /^v\d+\.\d+\.\d+$/
+  before_script:
+    # Optional: removes the 'v' prefix for the dotnet version property
+    - export DOTNET_VERSION=$(echo $CI_COMMIT_TAG | sed 's/^v//')
+  artifacts:
+    paths:
+      - publish/
+    expire_in: 1 week
+
+build_linux:
+  extends: .publish_template
+  script:
+    - dotnet publish -c Release -r linux-x64 --self-contained true /p:PublishSingleFile=true /p:Version=$DOTNET_VERSION /p:AssemblyName=Yris-$DOTNET_VERSION -o publish/linux
+
+build_windows:
+  extends: .publish_template
+  script:
+    - dotnet publish -c Release -r win-x64 --self-contained true /p:PublishSingleFile=true /p:Version=$DOTNET_VERSION /p:AssemblyName=Yris-$DOTNET_VERSION -o publish/windows
+
+build_mac:
+  extends: .publish_template
+  script:
+    - dotnet publish -c Release -r osx-x64 --self-contained true /p:PublishSingleFile=true /p:Version=$DOTNET_VERSION /p:AssemblyName=Yris-$DOTNET_VERSION -o publish/macos
+
+create_release:
+  stage: release
+  image: registry.gitlab.com/gitlab-org/release-cli:latest
+  rules:
+    - if: $CI_COMMIT_TAG =~ /^v\d+\.\d+\.\d+$/
+  needs:
+    - job: build_linux
+    - job: build_windows
+    - job: build_mac
+  script:
+    - echo "Creating release for $CI_COMMIT_TAG"
+  release:
+    name: 'Release $CI_COMMIT_TAG'
+    tag_name: '$CI_COMMIT_TAG'
+    description: 'Automated build for version $CI_COMMIT_TAG'
+    assets:
+      links:
+        - name: 'Linux Binary (Yris)'
+          url: '${CI_PROJECT_URL}/-/jobs/artifacts/${CI_COMMIT_TAG}/browse/publish/linux?job=build_linux'
+        - name: 'Windows Executable (Yris)'
+          url: '${CI_PROJECT_URL}/-/jobs/artifacts/${CI_COMMIT_TAG}/browse/publish/windows?job=build_windows'
+        - name: 'MacOS Binary (Yris)'
+          url: '${CI_PROJECT_URL}/-/jobs/artifacts/${CI_COMMIT_TAG}/browse/publish/mac?job=build_mac'
