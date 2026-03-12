@@ -5,10 +5,6 @@
 .publish_template:
   stage: build
   image: mcr.microsoft.com/dotnet/sdk:9.0
-  rules:
-    - if: $CI_COMMIT_TAG =~ /^v\d+\.\d+\.\d+$/
-  before_script:
-    - export DOTNET_VERSION=$(echo $CI_COMMIT_TAG | sed 's/^v//')
   artifacts:
     paths:
       - publish/
@@ -17,17 +13,17 @@
 build_linux:
   extends: .publish_template
   script:
-    - dotnet publish -c Release -r linux-x64 --self-contained true /p:PublishSingleFile=true /p:Version=$DOTNET_VERSION /p:AssemblyName=Yris-$DOTNET_VERSION -o publish/linux
+    - dotnet publish -c Release -r linux-x64 --self-contained true /p:PublishSingleFile=true -o publish/linux
 
 build_windows:
   extends: .publish_template
   script:
-    - dotnet publish -c Release -r win-x64 --self-contained true /p:PublishSingleFile=true /p:Version=$DOTNET_VERSION /p:AssemblyName=Yris-$DOTNET_VERSION -o publish/windows
+    - dotnet publish -c Release -r win-x64 --self-contained true /p:PublishSingleFile=true -o publish/windows
 
 build_mac:
   extends: .publish_template
   script:
-    - dotnet publish -c Release -r osx-x64 --self-contained true /p:PublishSingleFile=true /p:Version=$DOTNET_VERSION /p:AssemblyName=Yris-$DOTNET_VERSION -o publish/macos
+    - dotnet publish -c Release -r osx-x64 --self-contained true /p:PublishSingleFile=true -o publish/macos
 
 create_release:
   stage: release
@@ -46,15 +42,15 @@ create_release:
   script:
     - |
       curl --fail --header "JOB-TOKEN: $CI_JOB_TOKEN" \
-           --upload-file "publish/linux/Yris-$DOTNET_VERSION" \
+           --upload-file "publish/linux/Yris-Engine" \
            "${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/yris/${CI_COMMIT_TAG}/Yris-${DOTNET_VERSION}-linux"
     - |
       curl --fail --header "JOB-TOKEN: $CI_JOB_TOKEN" \
-           --upload-file "publish/windows/Yris-$DOTNET_VERSION.exe" \
+           --upload-file "publish/windows/Yris-Engine.exe" \
            "${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/yris/${CI_COMMIT_TAG}/Yris-${DOTNET_VERSION}-windows.exe"
     - |
       curl --fail --header "JOB-TOKEN: $CI_JOB_TOKEN" \
-           --upload-file "publish/macos/Yris-$DOTNET_VERSION" \
+           --upload-file "publish/macos/Yris-Engine" \
            "${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/yris/${CI_COMMIT_TAG}/Yris-${DOTNET_VERSION}-macos"
   release:
     name: "Release $CI_COMMIT_TAG"
