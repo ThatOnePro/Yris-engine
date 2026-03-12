@@ -1,69 +1,109 @@
 ﻿stages:
   - build
+  - publish
   - release
 
-.publish_template:
+variables:
+  APP_NAME: "Yris"
+  DOTNET_IMAGE: "mcr.microsoft.com/dotnet/sdk:9.0"
+
+# ─────────────────────────────────────────────────────────────
+# Build — runs on every normal push, skipped when a tag fires
+# ─────────────────────────────────────────────────────────────
+build:
   stage: build
-  image: mcr.microsoft.com/dotnet/sdk:9.0
-  artifacts:
-    paths:
-      - publish/
-    expire_in: 1 week
-
-build_linux:
-  extends: .publish_template
+  image: $DOTNET_IMAGE
   script:
-    - dotnet publish -c Release -r linux-x64 --self-contained true /p:PublishSingleFile=true -o publish/linux
-
-build_windows:
-  extends: .publish_template
-  script:
-    - dotnet publish -c Release -r win-x64 --self-contained true /p:PublishSingleFile=true -o publish/windows
-
-build_mac:
-  extends: .publish_template
-  script:
-    - dotnet publish -c Release -r osx-x64 --self-contained true /p:PublishSingleFile=true -o publish/macos
-
-create_release:
-  stage: release
-  image: registry.gitlab.com/gitlab-org/release-cli:latest
+    - dotnet build -c Release
   rules:
     - if: $CI_COMMIT_TAG =~ /^v\d+\.\d+\.\d+$/
-  needs:
-    - job: build_linux
-      artifacts: true
-    - job: build_windows
-      artifacts: true
-    - job: build_mac
-      artifacts: true
-  before_script:
-    - export DOTNET_VERSION=$(echo $CI_COMMIT_TAG | sed 's/^v//')
+      when: never
+    - when: always
+
+# ─────────────────────────────────────────────────────────────
+# Shared publish template — only runs on vX.Y.Z tags
+# Each job overrides RID, PLATFORM_SUFFIX, and FILE_EXT
+# ─────────────────────────────────────────────────────────────
+.publish:
+  stage: publish
+  image: $DOTNET_IMAGE
+  rules:
+    - if: $CI_COMMIT_TAG =~ /^v\d+\.\d+\.\d+$/
   script:
+    - BINARY_NAME="${APP_NAME}-${CI_COMMIT_TAG}-${PLATFORM_SUFFIX}"
     - |
-      curl --fail --header "JOB-TOKEN: $CI_JOB_TOKEN" \
-           --upload-file "publish/linux/Yris-Engine" \
-           "${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/yris/${CI_COMMIT_TAG}/Yris-${DOTNET_VERSION}-linux"
+      dotnet publish -c Release \
+        -r "${RID}" \
+        --self-contained true \
+        /p:PublishSingleFile=true \
+        /p:DebugType=None \
+        /p:DebugSymbols=false \
+        /p:AssemblyName="${BINARY_NAME}" \
+        -o ./publish
     - |
-      curl --fail --header "JOB-TOKEN: $CI_JOB_TOKEN" \
-           --upload-file "publish/windows/Yris-Engine.exe" \
-           "${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/yris/${CI_COMMIT_TAG}/Yris-${DOTNET_VERSION}-windows.exe"
-    - |
-      curl --fail --header "JOB-TOKEN: $CI_JOB_TOKEN" \
-           --upload-file "publish/macos/Yris-Engine" \
-           "${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/yris/${CI_COMMIT_TAG}/Yris-${DOTNET_VERSION}-macos"
+      curl --fail --header "JOB-TOKEN: ${CI_JOB_TOKEN}" \
+           --upload-file "./publish/${BINARY_NAME}${FILE_EXT}" \
+           "${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/${APP_NAME}/${CI_COMMIT_TAG}/${BINARY_NAME}${FILE_EXT}"
+
+publish:linux-x64:
+  extends: .publish
+  variables:
+    RID: linux-x64
+    PLATFORM_SUFFIX: linux-x64
+    FILE_EXT: ""
+
+publish:win-x64:
+  extends: .publish
+  variables:
+    RID: win-x64
+    PLATFORM_SUFFIX: win-x64
+    FILE_EXT: ".exe"
+
+publish:osx-x64:
+  extends: .publish
+  variables:
+    RID: osx-x64
+    PLATFORM_SUFFIX: osx-x64
+    FILE_EXT: ""
+
+publish:osx-arm64: # Apple Silicon
+  extends: .publish
+  variables:
+    RID: osx-arm64
+    PLATFORM_SUFFIX: osx-arm64
+    FILE_EXT: ""
+
+# ─────────────────────────────────────────────────────────────
+# Release — creates a GitLab Release with download links
+# Waits for all publish jobs to finish uploading first
+# ─────────────────────────────────────────────────────────────
+release:
+  stage: release
+  image: registry.gitlab.com/gitlab-org/release-cli:latest
+  needs:
+    - publish:linux-x64
+    - publish:win-x64
+    - publish:osx-x64
+    - publish:osx-arm64
+  script:
+    - echo "Creating GitLab Release for ${CI_COMMIT_TAG}"
   release:
+    tag_name: $CI_COMMIT_TAG
     name: "Release $CI_COMMIT_TAG"
-    tag_name: "$CI_COMMIT_TAG"
-    description: "Automated build for version $CI_COMMIT_TAG"
+    description: "Automated release for $CI_COMMIT_TAG"
     assets:
       links:
-        - name: "Yris-$CI_COMMIT_TAG (Linux x64)"
-          url: "${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/yris/${CI_COMMIT_TAG}/Yris-${CI_COMMIT_TAG#v}-linux"
-          link_type: other
-        - name: "Yris-$CI_COMMIT_TAG (Windows x64)"
-          url: "${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/yris/${CI_COMMIT_TAG}/Yris-${CI_COMMIT_TAG#v}-windows.exe"
-          link_type: other
-        - name: "Yris-$CI_COMMIT_TAG (macOS x64)"
-          url: "${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/yris/${CI_COMMIT_TAG}/Yris-${CI_COMMIT_TAG#v}-macos"
-          link_type: other
+        - name: "$APP_NAME-$CI_COMMIT_TAG-linux-x64"
+          url: "$CI_API_V4_URL/projects/$CI_PROJECT_ID/packages/generic/$APP_NAME/$CI_COMMIT_TAG/$APP_NAME-$CI_COMMIT_TAG-linux-x64"
+          link_type: package
+        - name: "$APP_NAME-$CI_COMMIT_TAG-win-x64.exe"
+          url: "$CI_API_V4_URL/projects/$CI_PROJECT_ID/packages/generic/$APP_NAME/$CI_COMMIT_TAG/$APP_NAME-$CI_COMMIT_TAG-win-x64.exe"
+          link_type: package
+        - name: "$APP_NAME-$CI_COMMIT_TAG-osx-x64"
+          url: "$CI_API_V4_URL/projects/$CI_PROJECT_ID/packages/generic/$APP_NAME/$CI_COMMIT_TAG/$APP_NAME-$CI_COMMIT_TAG-osx-x64"
+          link_type: package
+        - name: "$APP_NAME-$CI_COMMIT_TAG-osx-arm64"
+          url: "$CI_API_V4_URL/projects/$CI_PROJECT_ID/packages/generic/$APP_NAME/$CI_COMMIT_TAG/$APP_NAME-$CI_COMMIT_TAG-osx-arm64"
+          link_type: package
+  rules:
+    - if: $CI_COMMIT_TAG =~ /^v\d+\.\d+\.\d+$/
