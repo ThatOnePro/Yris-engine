@@ -2,19 +2,12 @@
   - build
   - release
 
-# Controls when the entire pipeline is allowed to be created
-workflow:
-  rules:
-    - if: $CI_COMMIT_TAG =~ /^v\d+\.\d+\.\d+$/
-
-variables:
-  CLEAN_VERSION: $CI_COMMIT_TAG
-
 .publish_template:
   stage: build
   image: mcr.microsoft.com/dotnet/sdk:9.0
+  rules:
+    - if: $CI_COMMIT_TAG =~ /^v\d+\.\d+\.\d+$/
   before_script:
-    # Extracts the numeric version by removing the 'v' prefix
     - export DOTNET_VERSION=$(echo $CI_COMMIT_TAG | sed 's/^v//')
   artifacts:
     paths:
@@ -39,6 +32,8 @@ build_mac:
 create_release:
   stage: release
   image: registry.gitlab.com/gitlab-org/release-cli:latest
+  rules:
+    - if: $CI_COMMIT_TAG =~ /^v\d+\.\d+\.\d+$/
   needs:
     - job: build_linux
       artifacts: true
@@ -46,17 +41,33 @@ create_release:
       artifacts: true
     - job: build_mac
       artifacts: true
+  before_script:
+    - export DOTNET_VERSION=$(echo $CI_COMMIT_TAG | sed 's/^v//')
   script:
-    - echo "Creating release for $CI_COMMIT_TAG"
+    - |
+      curl --fail --header "JOB-TOKEN: $CI_JOB_TOKEN" \
+           --upload-file "publish/linux/Yris-$DOTNET_VERSION" \
+           "${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/yris/${CI_COMMIT_TAG}/Yris-${DOTNET_VERSION}-linux"
+    - |
+      curl --fail --header "JOB-TOKEN: $CI_JOB_TOKEN" \
+           --upload-file "publish/windows/Yris-$DOTNET_VERSION.exe" \
+           "${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/yris/${CI_COMMIT_TAG}/Yris-${DOTNET_VERSION}-windows.exe"
+    - |
+      curl --fail --header "JOB-TOKEN: $CI_JOB_TOKEN" \
+           --upload-file "publish/macos/Yris-$DOTNET_VERSION" \
+           "${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/yris/${CI_COMMIT_TAG}/Yris-${DOTNET_VERSION}-macos"
   release:
-    name: 'Release $CI_COMMIT_TAG'
-    tag_name: '$CI_COMMIT_TAG'
-    description: 'Automated build for version $CI_COMMIT_TAG'
+    name: "Release $CI_COMMIT_TAG"
+    tag_name: "$CI_COMMIT_TAG"
+    description: "Automated build for version $CI_COMMIT_TAG"
     assets:
       links:
-        - name: 'Linux Binary (Yris)'
-          url: '${CI_PROJECT_URL}/-/jobs/artifacts/${CI_COMMIT_TAG}/browse/publish/linux?job=build_linux'
-        - name: 'Windows Executable (Yris)'
-          url: '${CI_PROJECT_URL}/-/jobs/artifacts/${CI_COMMIT_TAG}/browse/publish/windows?job=build_windows'
-        - name: 'MacOS Binary (Yris)'
-          url: '${CI_PROJECT_URL}/-/jobs/artifacts/${CI_COMMIT_TAG}/browse/publish/macos?job=build_mac'
+        - name: "Yris-$CI_COMMIT_TAG (Linux x64)"
+          url: "${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/yris/${CI_COMMIT_TAG}/Yris-${CI_COMMIT_TAG#v}-linux"
+          link_type: other
+        - name: "Yris-$CI_COMMIT_TAG (Windows x64)"
+          url: "${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/yris/${CI_COMMIT_TAG}/Yris-${CI_COMMIT_TAG#v}-windows.exe"
+          link_type: other
+        - name: "Yris-$CI_COMMIT_TAG (macOS x64)"
+          url: "${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/yris/${CI_COMMIT_TAG}/Yris-${CI_COMMIT_TAG#v}-macos"
+          link_type: other
