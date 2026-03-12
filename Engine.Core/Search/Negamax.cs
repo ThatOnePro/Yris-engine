@@ -133,12 +133,11 @@ public static class Negamax
                 alpha = standPat;
             }
         }
-
+        // can be imrpoves by only generating captures and checks ma voor nu is dit ok
         var moves = OrderMoves(pos, MoveGenerator.GenerateLegalMoves(pos));
 
         foreach (var scoredMove in moves)
         {
-            // Only search captures and promotions
             if (pos.Squares[scoredMove.Move.To] == 0 && scoredMove.Move.Promotion == 0)
                 continue;
 
