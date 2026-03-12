@@ -1,4 +1,5 @@
-﻿using Engine.Core.Board;
+﻿using System.Diagnostics;
+using Engine.Core.Board;
 using Engine.Core.Moves;
 using Engine.Core.Search;
 
@@ -34,6 +35,8 @@ while (true)
 
     else if (command.StartsWith("go"))
     {
+        bool shouldTime = false;
+        Stopwatch? sw = null;
         int searchDepth = depth;
         var parts = command.Split(' ', StringSplitOptions.RemoveEmptyEntries);
         for (int i = 1; i < parts.Length; i++)
@@ -41,11 +44,24 @@ while (true)
             if (parts[i] == "depth" && i + 1 < parts.Length && int.TryParse(parts[i + 1], out var d))
             {
                 searchDepth = d;
-                break;
+            }
+
+            if (parts[i] == "timer")
+            {
+                shouldTime = true;
             }
         }
 
+        if (shouldTime) sw = Stopwatch.StartNew();
+
         var bestMove = Negamax.GetBestMove(position, depth: searchDepth);
+
+        if (shouldTime && sw != null)
+        {
+            sw.Stop();
+            Console.WriteLine($"info time {sw.ElapsedMilliseconds}ms ({sw.Elapsed.TotalSeconds:F2}s)");
+        }
+
         Console.WriteLine($"bestmove {bestMove.ToUci()}");
     }
 
