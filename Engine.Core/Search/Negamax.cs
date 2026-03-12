@@ -10,9 +10,12 @@ public static class Negamax
     
     private static TranspositionTable _tt = new TranspositionTable(256);
     
+    private const int MateScore = 100000;
+
     public static List<ScoredMove> OrderMoves(Position pos, List<Move> moves)
     {
-        List<ScoredMove> orderedMoves = new();
+        List<ScoredMove> orderedMoves = new(moves.Count);
+
         foreach (var move in moves)
         {
             var movingPiece = pos.Squares[move.From];
@@ -20,14 +23,15 @@ public static class Negamax
 
             int score = 0;
 
-            // 1. MVV-LVA (Most Valuable Victim - Least Valuable Attacker)
+            // MVV-LVA
             if (capturedPiece != 0)
             {
-                score = 100 * Math.Abs(Eval.GetPieceValue(capturedPiece)) - Math.Abs(Eval.GetPieceValue(movingPiece));
-                score += 10000; // Zorg dat slaan altijd boven stille zetten staat
+                score = 10000 +
+                        100 * Math.Abs(Eval.GetPieceValue(capturedPiece)) -
+                        Math.Abs(Eval.GetPieceValue(movingPiece));
             }
 
-            // 2. Promoties zijn ook topprioriteit
+            // Promotion bonus
             if (move.Promotion != 0)
             {
                 score += 5000;
@@ -35,37 +39,42 @@ public static class Negamax
 
             orderedMoves.Add(new ScoredMove(move, score));
         }
+
         orderedMoves.Sort((a, b) => b.Score.CompareTo(a.Score));
-        
+
         return orderedMoves;
     }
-    
+
     public static Move GetBestMove(Position pos, int depth)
     {
         Move bestMove = new Move();
-        double bestValue = double.NegativeInfinity;
-        double alpha = double.NegativeInfinity;
-        double beta = double.PositiveInfinity;
 
-        var moves = MoveGenerator.GenerateLegalMoves(pos);
+        int bestValue = int.MinValue + 1;
+        int alpha = int.MinValue + 1;
+        int beta = int.MaxValue;
 
-        foreach (var move in moves)
+        var moves = OrderMoves(pos, MoveGenerator.GenerateLegalMoves(pos));
+
+        foreach (var scoredMove in moves)
         {
-            pos.MakeMove(move);
-            double boardValue = -NegamaxScore(pos, depth - 1, -beta, -alpha);
+            pos.MakeMove(scoredMove.Move);
+
+            int boardValue = -NegamaxScore(pos, depth - 1, -beta, -alpha, 1);
+
             pos.UndoMove();
 
             if (boardValue > bestValue)
             {
                 bestValue = boardValue;
-                bestMove = move;
+                bestMove = scoredMove.Move;
             }
 
-            alpha = Math.Max(alpha, boardValue);
+            alpha = Math.Max(alpha, bestValue);
         }
 
         return bestMove;
     }
+
     
     // public Move GetBestMoveParallel(Position pos, int depth)
     // {
@@ -93,8 +102,12 @@ public static class Negamax
     // }
 
     
-    private static double NegamaxScore(Position pos, int depth, double alpha, double beta)
+    private static int NegamaxScore(Position pos, int depth, int alpha, int beta, int ply)
     {
+        if (depth == 0)
+        {
+            return Quiescence(pos, alpha, beta);
+        }
         TTEntry? entry = _tt.Lookup(pos.ZobristKey);
         if (entry.HasValue && entry.Value.Depth >= depth)
         {
@@ -108,14 +121,28 @@ public static class Negamax
         if (depth == 0) return Eval.MaterialScore(pos);
 
         var moves = MoveGenerator.GenerateLegalMoves(pos);
+
+        // Checkmate / stalemate detection
+        if (moves.Count == 0)
+        {
+            if (AttackDetector.IsKingInCheck(pos, pos.SideToMove))
+            {
+                return -MateScore + ply;
+            }
+
+            return 0; // stalemate
+        }
+
         var orderedMoves = OrderMoves(pos, moves);
 
-        double maxEval = double.NegativeInfinity;
+        int maxEval = int.MinValue + 1;
 
-        foreach (var move in moves)
+        foreach (var orderedMove in orderedMoves)
         {
-            pos.MakeMove(move);
-            double eval = -NegamaxScore(pos, depth - 1, -beta, -alpha);
+            pos.MakeMove(orderedMove.Move);
+
+            int eval = -NegamaxScore(pos, depth - 1, -beta, -alpha, ply + 1);
+
             pos.UndoMove();
 
             maxEval = Math.Max(maxEval, eval);
@@ -123,10 +150,56 @@ public static class Negamax
 
             if (alpha >= beta)
             {
-                break;
+                break; // beta cutoff
             }
         }
 
         return maxEval;
+    }
+
+
+    private static int Quiescence(Position pos, int alpha, int beta)
+    {
+        int standPat = Eval.MaterialScore(pos);
+
+        bool inCheck = AttackDetector.IsKingInCheck(pos, pos.SideToMove);
+        if (!inCheck)
+        {
+            if (standPat >= beta)
+            {
+                return beta;
+            }
+
+            if (alpha < standPat)
+            {
+                alpha = standPat;
+            }
+        }
+        // can be imrpoves by only generating captures and checks ma voor nu is dit ok
+        var moves = OrderMoves(pos, MoveGenerator.GenerateLegalMoves(pos));
+
+        foreach (var scoredMove in moves)
+        {
+            if (pos.Squares[scoredMove.Move.To] == 0 && scoredMove.Move.Promotion == 0)
+                continue;
+
+            pos.MakeMove(scoredMove.Move);
+
+            int score = -Quiescence(pos, -beta, -alpha);
+
+            pos.UndoMove();
+
+            if (score >= beta)
+            {
+                return beta;
+            }
+
+            if (score > alpha)
+            {
+                alpha = score;
+            }
+        }
+
+        return alpha;
     }
 }
