@@ -12,9 +12,9 @@ public static class Eval
     private const int MobilityWeight = 5; // 5 centipawns per legal move
     
 
-    public static double MaterialScore(Position position)
+    public static int MaterialScore(Position position)
     {
-        double score = 0;
+        int score = 0;
 
         // 1. Material Evaluation
         foreach (var piece in position.Squares)
