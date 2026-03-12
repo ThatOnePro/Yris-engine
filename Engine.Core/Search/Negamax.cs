@@ -118,8 +118,6 @@ public static class Negamax
             if (alpha >= beta) return entry.Value.Value;
         }
         
-        if (depth == 0) return Eval.MaterialScore(pos);
-
         var moves = MoveGenerator.GenerateLegalMoves(pos);
 
         // Checkmate / stalemate detection
