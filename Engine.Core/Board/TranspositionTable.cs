@@ -1,45 +1,54 @@
 using Engine.Core.Moves;
 
-namespace Engine.Core.Board;
-
-public class TranspositionTable
+public static class TranspositionTable
 {
-    private readonly TTEntry[] _table;
-    private readonly ulong _size;
+    private const int Size = 1 << 20; // ~1M entries
 
-    public TranspositionTable(int sizeMb)
+    private static TTEntry[] table = new TTEntry[Size];
+
+    public static void Store(ulong key, int depth, int score, TTFlag flag, Move bestMove)
     {
-        // Bereken hoeveel entries er in het geheugen passen
-        int entrySize = System.Runtime.InteropServices.Marshal.SizeOf<TTEntry>();
-        _size = (ulong)(sizeMb * 1024 * 1024 / entrySize);
-        _table = new TTEntry[_size];
-    }
+        int index = (int)(key % Size);
 
-    public void Store(ulong key, int depth, double value, HashFlag flag, Move bestMove)
-    {
-        ulong index = key % _size;
-
-        // Eenvoudige vervangingsstrategie: 
-        // Overschrijf als de nieuwe zoektocht dieper was (en dus betrouwbaarder)
-        if (_table[index].Key == 0 || _table[index].Depth <= depth)
+        table[index] = new TTEntry
         {
-            _table[index] = new TTEntry
-            {
-                Key = key,
-                Value = (short)value,
-                Depth = (short)depth,
-                Flag = flag,
-                BestMove = bestMove
-            };
-        }
+            Key = key,
+            Depth = depth,
+            Score = score,
+            Flag = flag,
+            BestMove = bestMove
+        };
     }
 
-    public TTEntry? Lookup(ulong key)
+    public static bool Probe(ulong key, int depth, int alpha, int beta, out int score, out Move bestMove)
     {
-        ulong index = key % _size;
-        TTEntry entry = _table[index];
+        int index = (int)(key % Size);
+        var entry = table[index];
 
-        if (entry.Key == key) return entry;
-        return null;
+        bestMove = entry.BestMove;
+
+        if (entry.Key == key && entry.Depth >= depth)
+        {
+            if (entry.Flag == TTFlag.Exact)
+            {
+                score = entry.Score;
+                return true;
+            }
+
+            if (entry.Flag == TTFlag.LowerBound && entry.Score >= beta)
+            {
+                score = entry.Score;
+                return true;
+            }
+
+            if (entry.Flag == TTFlag.UpperBound && entry.Score <= alpha)
+            {
+                score = entry.Score;
+                return true;
+            }
+        }
+
+        score = 0;
+        return false;
     }
 }

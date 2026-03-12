@@ -1,4 +1,3 @@
-using System.Collections.Concurrent;
 using Engine.Core.Board;
 using Engine.Core.MoveGen;
 using Engine.Core.Moves;
@@ -7,12 +6,9 @@ namespace Engine.Core.Search;
 
 public static class Negamax
 {
-    
-    private static TranspositionTable _tt = new TranspositionTable(256);
-    
     private const int MateScore = 100000;
 
-    public static List<ScoredMove> OrderMoves(Position pos, List<Move> moves)
+    public static List<ScoredMove> OrderMoves(Position pos, List<Move> moves, Move ttMove = default)
     {
         List<ScoredMove> orderedMoves = new(moves.Count);
 
@@ -23,12 +19,18 @@ public static class Negamax
 
             int score = 0;
 
+            // TT move gets highest priority
+            if (move.Equals(ttMove))
+            {
+                score += 20000;
+            }
+
             // MVV-LVA
             if (capturedPiece != 0)
             {
-                score = 10000 +
-                        100 * Math.Abs(Eval.GetPieceValue(capturedPiece)) -
-                        Math.Abs(Eval.GetPieceValue(movingPiece));
+                score += 10000 +
+                         100 * Math.Abs(Eval.GetPieceValue(capturedPiece)) -
+                         Math.Abs(Eval.GetPieceValue(movingPiece));
             }
 
             // Promotion bonus
@@ -49,13 +51,14 @@ public static class Negamax
     {
         Move bestMove = new Move();
 
-        int bestValue = int.MinValue + 1;
         int alpha = int.MinValue + 1;
         int beta = int.MaxValue;
+        int bestValue = int.MinValue + 1;
 
-        var moves = OrderMoves(pos, MoveGenerator.GenerateLegalMoves(pos));
+        var moves = MoveGenerator.GenerateLegalMoves(pos);
+        var orderedMoves = OrderMoves(pos, moves);
 
-        foreach (var scoredMove in moves)
+        foreach (var scoredMove in orderedMoves)
         {
             pos.MakeMove(scoredMove.Move);
 
@@ -75,52 +78,26 @@ public static class Negamax
         return bestMove;
     }
 
-    
-    public static Move GetBestMoveParallel(Position pos, int depth)
-    {
-        var moves = MoveGenerator.GenerateLegalMoves(pos);
-        var orderedMoves = OrderMoves(pos, moves);
-    
-        // Gebruik een thread-safe container voor de resultaten
-        var results = new ConcurrentBag<(Move move, double score)>();
-    
-        Parallel.ForEach(orderedMoves, moveWrap =>
-        {
-            // ELKE THREAD HEEFT EEN EIGEN KOPIE VAN HET BORD NODIG
-            Position threadPos = pos.Clone(); 
-        
-            threadPos.MakeMove(moveWrap.Move);
-            // We starten Negamax op de kopie
-            double score = -NegamaxScore(threadPos, depth - 1, Convert.ToInt32(double.NegativeInfinity), Convert.ToInt32(double.PositiveInfinity), 1);
-            threadPos.UndoMove();
-    
-            results.Add((moveWrap.Move, score));
-        });
-    
-        // Zoek de beste score uit de verzamelde resultaten
-        return results.OrderByDescending(r => r.score).First().move;
-    }
-
-    
     private static int NegamaxScore(Position pos, int depth, int alpha, int beta, int ply)
     {
+        int originalAlpha = alpha;
+
+        ulong hash = pos.ZobristKey;
+
+        // Transposition Table Probe
+        if (TranspositionTable.Probe(hash, depth, alpha, beta, out int ttScore, out Move ttMove))
+        {
+            return ttScore;
+        }
+
         if (depth == 0)
         {
             return Quiescence(pos, alpha, beta);
         }
-        TTEntry? entry = _tt.Lookup(pos.ZobristKey);
-        if (entry.HasValue && entry.Value.Depth >= depth)
-        {
-            if (entry.Value.Flag == HashFlag.Exact) return entry.Value.Value;
-            if (entry.Value.Flag == HashFlag.LowerBound) alpha = Math.Max(alpha, entry.Value.Value);
-            if (entry.Value.Flag == HashFlag.UpperBound) beta = Math.Min(beta, entry.Value.Value);
-        
-            if (alpha >= beta) return entry.Value.Value;
-        }
-        
+
         var moves = MoveGenerator.GenerateLegalMoves(pos);
 
-        // Checkmate / stalemate detection
+        // Checkmate / stalemate
         if (moves.Count == 0)
         {
             if (AttackDetector.IsKingInCheck(pos, pos.SideToMove))
@@ -128,10 +105,12 @@ public static class Negamax
                 return -MateScore + ply;
             }
 
-            return 0; // stalemate
+            return 0;
         }
 
-        var orderedMoves = OrderMoves(pos, moves);
+        Move bestMove = default;
+
+        var orderedMoves = OrderMoves(pos, moves, ttMove);
 
         int maxEval = int.MinValue + 1;
 
@@ -143,7 +122,12 @@ public static class Negamax
 
             pos.UndoMove();
 
-            maxEval = Math.Max(maxEval, eval);
+            if (eval > maxEval)
+            {
+                maxEval = eval;
+                bestMove = orderedMove.Move;
+            }
+
             alpha = Math.Max(alpha, eval);
 
             if (alpha >= beta)
@@ -152,15 +136,34 @@ public static class Negamax
             }
         }
 
+        // Determine TT flag
+        TTFlag flag;
+
+        if (maxEval <= originalAlpha)
+        {
+            flag = TTFlag.UpperBound;
+        }
+        else if (maxEval >= beta)
+        {
+            flag = TTFlag.LowerBound;
+        }
+        else
+        {
+            flag = TTFlag.Exact;
+        }
+
+        // Store in TT
+        TranspositionTable.Store(hash, depth, maxEval, flag, bestMove);
+
         return maxEval;
     }
-
 
     private static int Quiescence(Position pos, int alpha, int beta)
     {
         int standPat = Eval.MaterialScore(pos);
 
         bool inCheck = AttackDetector.IsKingInCheck(pos, pos.SideToMove);
+
         if (!inCheck)
         {
             if (standPat >= beta)
@@ -173,12 +176,14 @@ public static class Negamax
                 alpha = standPat;
             }
         }
-        // can be imrpoves by only generating captures and checks ma voor nu is dit ok
+
         var moves = OrderMoves(pos, MoveGenerator.GenerateLegalMoves(pos));
 
         foreach (var scoredMove in moves)
         {
-            if (pos.Squares[scoredMove.Move.To] == 0 && scoredMove.Move.Promotion == 0)
+            if (!inCheck &&
+                pos.Squares[scoredMove.Move.To] == 0 &&
+                scoredMove.Move.Promotion == 0)
                 continue;
 
             pos.MakeMove(scoredMove.Move);
