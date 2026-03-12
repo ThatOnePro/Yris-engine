@@ -1,8 +1,6 @@
 ﻿using Engine.Core.Board;
 using Engine.Core.Moves;
 using Engine.Core.Search;
-using Engine.Core.Board;
-using Engine.Core.Search;
 
 Position position = new Position();
 var depth = 4;
@@ -36,7 +34,18 @@ while (true)
 
     else if (command.StartsWith("go"))
     {
-        var bestMove = Negamax.GetBestMove(position, depth: depth);
+        int searchDepth = depth;
+        var parts = command.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+        for (int i = 1; i < parts.Length; i++)
+        {
+            if (parts[i] == "depth" && i + 1 < parts.Length && int.TryParse(parts[i + 1], out var d))
+            {
+                searchDepth = d;
+                break;
+            }
+        }
+
+        var bestMove = Negamax.GetBestMove(position, depth: searchDepth);
         Console.WriteLine($"bestmove {bestMove.ToUci()}");
     }
 
