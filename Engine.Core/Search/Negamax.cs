@@ -43,13 +43,13 @@ public static class Negamax
 
     public static Move GetBestMove(Position pos, int depth)
     {
-        Move bestMove = new Move();
 
         int bestValue = int.MinValue + 1;
         int alpha = int.MinValue + 1;
         int beta = int.MaxValue;
 
         var moves = OrderMoves(pos, MoveGenerator.GenerateLegalMoves(pos));
+        Move bestMove = moves[0].Move;
 
         foreach (var scoredMove in moves)
         {
