@@ -8,6 +8,7 @@ namespace Engine.Core.Search;
 public static class Negamax
 {
     private const int MateScore = 100000;
+    private const int MateThreshold = MateScore - 1000;
 
     public static List<ScoredMove> OrderMoves(Position pos, List<Move> moves, Move ttMove = default)
     {
@@ -105,11 +106,21 @@ public static class Negamax
         int bestValue = int.MinValue + 1;
 
         var moves = MoveGenerator.GenerateLegalMoves(pos);
+        if (moves.Count == 0)
+        {
+            return default;
+        }
+
         Move bestMove = moves[0];
         var orderedMoves = OrderMoves(pos, moves);
 
         foreach (var scoredMove in orderedMoves)
         {
+            if (TimeManager.TimeExpired)
+            {
+                break;
+            }
+
             pos.MakeMove(scoredMove.Move);
 
             int boardValue = -NegamaxScore(pos, depth - 1, -beta, -alpha, 1);
@@ -132,17 +143,29 @@ public static class Negamax
     {
         int originalAlpha = alpha;
 
+        // Periodic time check
+        TimeManager.RecordNodes(1);
+        if (TimeManager.TimeExpired && ply > 0)
+        {
+            return Eval.MaterialScore(pos);
+        }
+
+        if (pos.HalfmoveClock >= 100 || (ply > 0 && pos.IsThreefoldRepetition()))
+        {
+            return Eval.GetRepetitionScore(pos, ply);
+        }
+
         ulong hash = pos.ZobristKey;
 
         // Transposition Table Probe
         if (TranspositionTable.Probe(hash, depth, alpha, beta, out int ttScore, out Move ttMove))
         {
-            return ttScore;
+            return ScoreFromTT(ttScore, ply);
         }
 
         if (depth == 0)
         {
-            return Quiescence(pos, alpha, beta);
+            return Quiescence(pos, alpha, beta, ply);
         }
 
         var moves = MoveGenerator.GenerateLegalMoves(pos);
@@ -203,13 +226,18 @@ public static class Negamax
         }
 
         // Store in TT
-        TranspositionTable.Store(hash, depth, maxEval, flag, bestMove);
+        TranspositionTable.Store(hash, depth, ScoreToTT(maxEval, ply), flag, bestMove);
 
         return maxEval;
     }
 
-    private static int Quiescence(Position pos, int alpha, int beta)
+    private static int Quiescence(Position pos, int alpha, int beta, int ply)
     {
+        if (pos.HalfmoveClock >= 100 || pos.IsThreefoldRepetition())
+        {
+            return Eval.GetRepetitionScore(pos, ply);
+        }
+
         int standPat = Eval.MaterialScore(pos);
 
         bool inCheck = AttackDetector.IsKingInCheck(pos, pos.SideToMove);
@@ -238,7 +266,7 @@ public static class Negamax
 
             pos.MakeMove(scoredMove.Move);
 
-            int score = -Quiescence(pos, -beta, -alpha);
+            int score = -Quiescence(pos, -beta, -alpha, ply + 1);
 
             pos.UndoMove();
 
@@ -254,5 +282,27 @@ public static class Negamax
         }
 
         return alpha;
+    }
+
+    private static int ScoreToTT(int score, int ply)
+    {
+        if (score >= MateThreshold)
+            return score + ply;
+
+        if (score <= -MateThreshold)
+            return score - ply;
+
+        return score;
+    }
+
+    private static int ScoreFromTT(int score, int ply)
+    {
+        if (score >= MateThreshold)
+            return score - ply;
+
+        if (score <= -MateThreshold)
+            return score + ply;
+
+        return score;
     }
 }

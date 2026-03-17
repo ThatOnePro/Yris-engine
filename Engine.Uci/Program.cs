@@ -1,10 +1,10 @@
-﻿using System.Diagnostics;
-using Engine.Core.Board;
+﻿using Engine.Core.Board;
 using Engine.Core.Moves;
 using Engine.Core.Search;
 
 Position position = new Position();
-var depth = 4;
+var depth = 5;
+Color engineColor = Color.White;
 
 while (true)
 {
@@ -26,18 +26,19 @@ while (true)
     else if (command == "ucinewgame")
     {
         position = new Position();
+        TranspositionTable.Clear();
     }
 
     else if (command.StartsWith("position"))
     {
-        ParsePosition(command, ref position);
+        ParsePosition(command, ref position, ref engineColor);
     }
 
     else if (command.StartsWith("go"))
     {
-        bool shouldTime = false;
-        Stopwatch? sw = null;
         int searchDepth = depth;
+        long allocatedTimeMs = 1000; // default 1 second
+        
         var parts = command.Split(' ', StringSplitOptions.RemoveEmptyEntries);
         for (int i = 1; i < parts.Length; i++)
         {
@@ -45,23 +46,43 @@ while (true)
             {
                 searchDepth = d;
             }
-
-            if (parts[i] == "timer")
+            else if (parts[i] == "movetime" && i + 1 < parts.Length && long.TryParse(parts[i + 1], out var mt))
             {
-                shouldTime = true;
+                allocatedTimeMs = mt;
+            }
+            else if (parts[i] == "wtime" && i + 1 < parts.Length && long.TryParse(parts[i + 1], out var wt))
+            {
+                if (engineColor == Color.White)
+                {
+                    // Use 1/40th of remaining time + 1 second increment if provided
+                    allocatedTimeMs = Math.Max(10, wt / 40);
+                }
+            }
+            else if (parts[i] == "btime" && i + 1 < parts.Length && long.TryParse(parts[i + 1], out var bt))
+            {
+                if (engineColor == Color.Black)
+                {
+                    allocatedTimeMs = Math.Max(10, bt / 40);
+                }
+            }
+            else if (parts[i] == "winc" && i + 1 < parts.Length && long.TryParse(parts[i + 1], out var wi))
+            {
+                if (engineColor == Color.White)
+                {
+                    allocatedTimeMs += wi;
+                }
+            }
+            else if (parts[i] == "binc" && i + 1 < parts.Length && long.TryParse(parts[i + 1], out var bi))
+            {
+                if (engineColor == Color.Black)
+                {
+                    allocatedTimeMs += bi;
+                }
             }
         }
 
-        if (shouldTime) sw = Stopwatch.StartNew();
-
+        TimeManager.StartSearch(allocatedTimeMs);
         var bestMove = Negamax.GetBestMove(position, depth: searchDepth);
-
-        if (shouldTime && sw != null)
-        {
-            sw.Stop();
-            Console.WriteLine($"info time {sw.ElapsedMilliseconds}ms ({sw.Elapsed.TotalSeconds:F2}s)");
-        }
-
         Console.WriteLine($"bestmove {bestMove.ToUci()}");
     }
 
@@ -86,7 +107,7 @@ while (true)
 }
 
 
-static void ParsePosition(string command, ref Position pos)
+static void ParsePosition(string command, ref Position pos, ref Color engineColor)
 {
     var parts = command.Split(' ');
     if (parts.Length < 2) return;
@@ -115,6 +136,9 @@ static void ParsePosition(string command, ref Position pos)
             pos.MakeMove(move);
         }
     }
+
+    // Update engine color based on side to move
+    engineColor = pos.SideToMove;
 }
 
 // var move = Negamax.GetBestMove(Fen.Parse("rnbqkbnr/ppp2p1p/3p2p1/4p2Q/2B1P3/3P4/PPP2PPP/RNB1K1NR b KQkq - 0 4"), 4);
@@ -169,3 +193,4 @@ static void ParsePosition(string command, ref Position pos)
 //
 // Perft.Divide(Fen.Parse(tests[1].Fen), 3);
 // public record PerftTest(string Name, string Fen, long[] Expected);
+
