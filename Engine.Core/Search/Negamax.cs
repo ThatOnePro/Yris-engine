@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using Engine.Core.Board;
 using Engine.Core.MoveGen;
 using Engine.Core.Moves;
@@ -46,7 +47,50 @@ public static class Negamax
 
         return orderedMoves;
     }
+    
+    public static Move GetBestMoveIterative(Position pos, int maxDepth)
+    {
+        Move bestMove = default;
+    
+        for (int currentDepth = 1; currentDepth <= maxDepth; currentDepth++)
+        {
+            // De parallelle loop profiteert van de resultaten van de vorige diepte in de TT
+            bestMove = GetBestMoveParallel(pos, currentDepth);
+        
+            Console.WriteLine($"Depth {currentDepth} completed. Best move: {bestMove}");
+        }
+        return bestMove;
+    }
 
+    public static Move GetBestMoveParallel(Position pos, int depth)
+    {
+        var moves = MoveGenerator.GenerateLegalMoves(pos);
+        var orderedMoves = OrderMoves(pos, moves);
+    
+        var options = new ParallelOptions { MaxDegreeOfParallelism = 4 };
+        
+        // Gebruik een thread-safe container voor de resultaten
+        var results = new ConcurrentBag<(Move move, double score)>();
+    
+        using (var threadLocalPos = new ThreadLocal<Position>(() => pos.Clone()))
+        {
+            Parallel.ForEach(orderedMoves, options, move =>
+            {
+                var p = threadLocalPos.Value; // Hergebruik het bord van deze thread
+            
+                p.MakeMove(move.Move);
+                // Gebruik de gedeelde TT binnen NegamaxScore
+                double score = -NegamaxScore(p, depth - 1, Convert.ToInt32(double.NegativeInfinity), Convert.ToInt32(double.PositiveInfinity), 1);
+                p.UndoMove();
+
+                results.Add((move.Move, score));
+            });
+        }
+
+        return results.OrderByDescending(r => r.score).First().move;
+    }
+    
+    
     public static Move GetBestMove(Position pos, int depth)
     {
 
