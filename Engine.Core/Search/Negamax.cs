@@ -72,20 +72,27 @@ public static class Negamax
         // Gebruik een thread-safe container voor de resultaten
         var results = new ConcurrentBag<(Move move, double score)>();
     
-        using (var threadLocalPos = new ThreadLocal<Position>(() => pos.Clone()))
-        {
-            Parallel.ForEach(orderedMoves, options, move =>
+        Parallel.ForEach(
+            orderedMoves, 
+            options, 
+            // Initialisatie: dit wordt één keer per thread uitgevoerd
+            () => pos.Clone(), 
+            // De eigenlijke loop body
+            (moveWrap, loopState, threadSpecificPos) => 
             {
-                var p = threadLocalPos.Value; // Hergebruik het bord van deze thread
+                threadSpecificPos.MakeMove(moveWrap.Move);
             
-                p.MakeMove(move.Move);
-                // Gebruik de gedeelde TT binnen NegamaxScore
-                double score = -NegamaxScore(p, depth - 1, Convert.ToInt32(double.NegativeInfinity), Convert.ToInt32(double.PositiveInfinity), 1);
-                p.UndoMove();
-
-                results.Add((move.Move, score));
-            });
-        }
+                // Gebruik stabiele integers voor Alpha/Beta om overflows te voorkomen
+                double score = -NegamaxScore(threadSpecificPos, depth - 1, -1000000, 1000000, 1);
+            
+                threadSpecificPos.UndoMove();
+                results.Add((moveWrap.Move, score));
+            
+                return threadSpecificPos; // Geef het bord door naar de volgende iteratie op deze thread
+            },
+            // Finalisatie per thread (optioneel)
+            (threadSpecificPos) => { }
+        );
 
         return results.OrderByDescending(r => r.score).First().move;
     }
