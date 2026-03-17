@@ -62,17 +62,26 @@ public static class MoveGenerator
 
         foreach (var move in pseudo)
         {
-            pos.MakeMove(move);
-
-            if (!AttackDetector.IsKingInCheck(pos, pos.SideToMove.Opposite()))
+            // In plaats van de bestaande 'pos' aan te passen, 
+            // controleren we de legaliteit direct.
+            if (IsMoveLegal(pos, move))
+            {
                 legal.Add(move);
-
-            pos.UndoMove();
+            }
         }
 
         return legal;
     }
 
+    private static bool IsMoveLegal(Position pos, Move move)
+    {
+        // Gebruik hier een TIJDELIJKE kopie of een hele lichte check
+        pos.MakeMove(move);
+        bool inCheck = AttackDetector.IsKingInCheck(pos, pos.SideToMove.Opposite());
+        pos.UndoMove();
+        return !inCheck;
+    }
+    
     private static readonly int[] KnightOffsets = { -17, -15, -10, -6, 6, 10, 15, 17 };
 
     private static void AddKnightMoves(Position pos, int from, Piece piece, List<Move> moves)
