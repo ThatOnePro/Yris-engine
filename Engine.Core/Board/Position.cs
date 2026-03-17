@@ -270,6 +270,37 @@ public sealed class Position
 
         ZobristKey = undo.ZobristKey;
     }
+
+    public bool IsThreefoldRepetition()
+    {
+        // Current position counts as one occurrence; we need at least two matching prior states.
+        return CountPreviousOccurrencesOfCurrentKey(minimumMatches: 2) >= 2;
+    }
+
+    private int CountPreviousOccurrencesOfCurrentKey(int minimumMatches)
+    {
+        if (_history.Count == 0 || HalfmoveClock < 4)
+            return 0;
+
+        int maxPliesToScan = Math.Min(HalfmoveClock, _history.Count);
+        int scanned = 0;
+        int matches = 0;
+
+        foreach (var undo in _history)
+        {
+            if (scanned++ >= maxPliesToScan)
+                break;
+
+            if (undo.ZobristKey != ZobristKey)
+                continue;
+
+            matches++;
+            if (matches >= minimumMatches)
+                break;
+        }
+
+        return matches;
+    }
     
     public Position Clone()
     {

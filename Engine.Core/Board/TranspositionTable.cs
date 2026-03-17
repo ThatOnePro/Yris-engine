@@ -6,9 +6,21 @@ public static class TranspositionTable
 
     private static TTEntry[] table = new TTEntry[Size];
 
+    public static void Clear()
+    {
+        Array.Clear(table, 0, table.Length);
+    }
+
     public static void Store(ulong key, int depth, int score, TTFlag flag, Move bestMove)
     {
         int index = (int)(key % Size);
+        var existing = table[index];
+
+        // Prefer replacing same-key entries or entries with lower searched depth.
+        if (existing.Key != key && existing.Depth > depth)
+        {
+            return;
+        }
 
         table[index] = new TTEntry
         {
@@ -25,9 +37,17 @@ public static class TranspositionTable
         int index = (int)(key % Size);
         var entry = table[index];
 
+        bestMove = default;
+
+        if (entry.Key != key)
+        {
+            score = 0;
+            return false;
+        }
+
         bestMove = entry.BestMove;
 
-        if (entry.Key == key && entry.Depth >= depth)
+        if (entry.Depth >= depth)
         {
             if (entry.Flag == TTFlag.Exact)
             {

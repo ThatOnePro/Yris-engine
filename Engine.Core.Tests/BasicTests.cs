@@ -62,4 +62,84 @@ public class BasicTests
         Assert.Equal(originalHalfmove, pos.HalfmoveClock);
         Assert.Equal(originalFullmove, pos.FullmoveNumber);
     }
+
+    [Fact]
+    public void RepetitionDetection_ShouldDetectThreefoldFromHistory()
+    {
+        var pos = Position.CreateStartPosition();
+
+        var repetitionLine = new[]
+        {
+            new Move(6, 21),  // Ng1-f3
+            new Move(62, 45), // Ng8-f6
+            new Move(21, 6),  // Nf3-g1
+            new Move(45, 62), // Nf6-g8
+            new Move(6, 21),
+            new Move(62, 45),
+            new Move(21, 6),
+            new Move(45, 62)
+        };
+
+        foreach (var move in repetitionLine)
+        {
+            pos.MakeMove(move);
+        }
+
+        Assert.True(pos.IsThreefoldRepetition());
+    }
+
+    [Fact]
+    public void RepetitionScore_ShouldPreferDrawWhenMateriallyBehind()
+    {
+        var winningSideToMove = Fen.Parse("4k3/8/8/8/8/8/8/3QK3 w - - 0 1");
+        var losingSideToMove = Fen.Parse("3qk3/8/8/8/8/8/8/4K3 w - - 0 1");
+
+        int winningScore = Eval.GetRepetitionScore(winningSideToMove, ply: 1);
+        int losingScore = Eval.GetRepetitionScore(losingSideToMove, ply: 1);
+
+        Assert.True(winningScore < 0);
+        Assert.True(losingScore > 0);
+    }
+
+    [Fact]
+    public void TT_ProbeMiss_ShouldNotLeakBestMoveFromCollidingEntry()
+    {
+        TranspositionTable.Clear();
+
+        ulong keyA = 1;
+        ulong keyB = keyA + (1UL << 20); // same TT bucket as keyA
+        var bestMoveA = new Move(12, 28);
+
+        TranspositionTable.Store(keyA, depth: 4, score: 25, flag: TTFlag.Exact, bestMove: bestMoveA);
+
+        bool hit = TranspositionTable.Probe(
+            keyB,
+            depth: 1,
+            alpha: -1000,
+            beta: 1000,
+            out _,
+            out Move probedMove);
+
+        Assert.False(hit);
+        Assert.Equal(default, probedMove);
+    }
+
+    [Fact]
+    public void TT_Collision_ShouldKeepDeeperEntry()
+    {
+        TranspositionTable.Clear();
+
+        ulong keyA = 7;
+        ulong keyB = keyA + (1UL << 20); // same TT bucket as keyA
+        var moveA = new Move(1, 18);
+
+        TranspositionTable.Store(keyA, depth: 6, score: 42, flag: TTFlag.Exact, bestMove: moveA);
+        TranspositionTable.Store(keyB, depth: 2, score: -13, flag: TTFlag.Exact, bestMove: new Move(6, 21));
+
+        bool hitA = TranspositionTable.Probe(keyA, depth: 1, alpha: -1000, beta: 1000, out int scoreA, out Move bestMoveA);
+
+        Assert.True(hitA);
+        Assert.Equal(42, scoreA);
+        Assert.Equal(moveA, bestMoveA);
+    }
 }
