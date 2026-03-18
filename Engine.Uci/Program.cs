@@ -2,10 +2,10 @@
 using Engine.Core.Book.bins;
 using Engine.Core.Moves;
 using Engine.Core.Search;
+using Engine.Uci;
 
 Position position = new Position();
-string path = Path.Combine(AppContext.BaseDirectory, "Titans.bin");
-OpeningBook.Load(path);
+BookLoader.LoadFromEmbedded();
 var depth = 5;
 Color engineColor = Color.White;
 

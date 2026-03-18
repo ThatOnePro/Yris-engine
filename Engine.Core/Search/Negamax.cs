@@ -100,7 +100,8 @@ public static class Negamax
     }
     public static Move FindBestMove(Position pos, int depth)
     {
-        var bookMove = OpeningBook.GetBookMove(pos.PolyglotKey, pos.SideToMove);
+        var legalMoves = MoveGenerator.GenerateLegalMoves(pos);
+        var bookMove = OpeningBook.GetBookMove(pos.PolyglotKey, pos.SideToMove, legalMoves);
 
         if (bookMove != null)
             return bookMove.Value;

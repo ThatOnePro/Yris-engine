@@ -5,16 +5,19 @@ namespace Engine.Core.Book.bins;
 
 public static class OpeningBook
 {
-    private static List<PolyglotEntry> entries = new();
+    private static readonly List<PolyglotEntry> _entries = new();
 
-    public static void Load(string path)
+    public static void Load(string bookPath)
     {
-        entries.Clear();
-
-        using var fs = new FileStream(path, FileMode.Open);
+        using var fs = File.OpenRead(bookPath);
         using var br = new BinaryReader(fs);
+        Load(br);
+    }
 
-        while (fs.Position < fs.Length)
+    public static void Load(BinaryReader br)
+    {
+        _entries.Clear();
+        while (br.BaseStream.Position < br.BaseStream.Length)
         {
             PolyglotEntry entry = new()
             {
@@ -24,7 +27,7 @@ public static class OpeningBook
                 Learn = ReadUInt32BigEndian(br)
             };
 
-            entries.Add(entry);
+            _entries.Add(entry);
         }
     }
 
@@ -74,31 +77,29 @@ public static class OpeningBook
         return new Move(from, to, promotionPiece);
     }
     
-    public static Move? GetBookMove(ulong polyglotKey, Color sideToMove)
+    public static Move? GetBookMove(ulong polyglotKey, Color sideToMove, IReadOnlyCollection<Move>? legalMoves = null)
     {
-        var moves = new List<PolyglotEntry>();
+        Move? bestMove = null;
+        int bestWeight = -1;
 
-        foreach (var entry in entries)
+        foreach (var entry in _entries)
         {
             if (entry.Key == polyglotKey)
-                moves.Add(entry);
+            {
+                var decodedMove = DecodeMove(entry.Move, sideToMove);
+
+                if (legalMoves != null && !legalMoves.Contains(decodedMove))
+                    continue;
+
+                if (entry.Weight > bestWeight)
+                {
+                    bestWeight = entry.Weight;
+                    bestMove = decodedMove;
+                }
+            }
         }
 
-        if (moves.Count == 0)
-            return null;
-
-        // Weighted random selection
-        int totalWeight = moves.Sum(e => e.Weight);
-        int rnd = Random.Shared.Next(totalWeight);
-
-        foreach (var entry in moves)
-        {
-            rnd -= entry.Weight;
-            if (rnd <= 0)
-                return DecodeMove(entry.Move, sideToMove);
-        }
-
-        return DecodeMove(moves[0].Move, sideToMove);
+        return bestMove;
     }
 }
 
