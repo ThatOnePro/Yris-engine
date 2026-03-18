@@ -10,6 +10,7 @@ public sealed class Position
     private readonly Stack<UndoState> _history = new();
 
     public ulong ZobristKey { get; set; } = 0;
+    public ulong PolyglotKey { get; set; } = 0;
 
     public CastlingRights Castling { get; set; } =
         CastlingRights.WhiteKingSide | CastlingRights.WhiteQueenSide |
@@ -40,6 +41,7 @@ public sealed class Position
         position.SideToMove = Color.White;
 
         position.ZobristKey = Zobrist.ComputeHash(position);
+        position.PolyglotKey = Polyglot.ComputeHash(position);
 
         return position;
     }
@@ -202,6 +204,7 @@ public sealed class Position
         SideToMove = SideToMove.Opposite();
 
         ZobristKey ^= Zobrist.SideKey;
+        PolyglotKey = Polyglot.ComputeHash(this);
     }
 
     public void UndoMove()
@@ -269,6 +272,7 @@ public sealed class Position
         FullmoveNumber = undo.FullMoveNumber;
 
         ZobristKey = undo.ZobristKey;
+        PolyglotKey = Polyglot.ComputeHash(this);
     }
 
     public bool IsThreefoldRepetition()
@@ -306,15 +310,14 @@ public sealed class Position
     {
         return new Position
         {
-            // Belangrijk: Maak een NIEUWE array en kopieer de inhoud
-            // Gebruik Array.Copy of .ToArray() voor snelheid
-            Squares = (Piece[])this.Squares.Clone(),
-            
-            // Value types (int, enum, ulong) worden automatisch gekopieerd
-            SideToMove = this.SideToMove,
-            Castling = this.Castling,
-            EnPassantSquare = this.EnPassantSquare,
-            ZobristKey = this.ZobristKey
+            Squares = (Piece[])Squares.Clone(),
+            SideToMove = SideToMove,
+            Castling = Castling,
+            EnPassantSquare = EnPassantSquare,
+            HalfmoveClock = HalfmoveClock,
+            FullmoveNumber = FullmoveNumber,
+            ZobristKey = ZobristKey,
+            PolyglotKey = PolyglotKey
         };
     }
 

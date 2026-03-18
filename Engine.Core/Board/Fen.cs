@@ -18,6 +18,7 @@ public static class Fen
         position.HalfmoveClock = int.Parse(parts[4]);
         position.FullmoveNumber = int.Parse(parts[5]);
         position.ZobristKey = Zobrist.ComputeHash(position);
+        position.PolyglotKey = Polyglot.ComputeHash(position);
 
         return position;
     }

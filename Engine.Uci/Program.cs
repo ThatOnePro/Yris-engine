@@ -1,8 +1,11 @@
 ﻿using Engine.Core.Board;
+using Engine.Core.Book.bins;
 using Engine.Core.Moves;
 using Engine.Core.Search;
 
 Position position = new Position();
+string path = Path.Combine(AppContext.BaseDirectory, "Titans.bin");
+OpeningBook.Load(path);
 var depth = 5;
 Color engineColor = Color.White;
 
@@ -82,7 +85,7 @@ while (true)
         }
 
         TimeManager.StartSearch(allocatedTimeMs);
-        var bestMove = Negamax.GetBestMove(position, depth: searchDepth);
+        var bestMove = Negamax.FindBestMove(position, depth: searchDepth);
         Console.WriteLine($"bestmove {bestMove.ToUci()}");
     }
 

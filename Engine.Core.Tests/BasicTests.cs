@@ -1,4 +1,6 @@
 using Engine.Core.Board;
+using Engine.Core.Book.bins;
+using Engine.Core.MoveGen;
 using Engine.Core.Moves;
 using Engine.Core.Search;
 
@@ -6,6 +8,9 @@ namespace Engine.Core.Tests;
 
 public class BasicTests
 {
+    private static bool s_bookLoaded;
+    private static readonly object s_bookLoadLock = new();
+
     [Fact]
     public void MakeUndo_ShouldRestorePosition()
     {
@@ -141,5 +146,65 @@ public class BasicTests
         Assert.True(hitA);
         Assert.Equal(42, scoreA);
         Assert.Equal(moveA, bestMoveA);
+    }
+
+    [Theory]
+    [InlineData("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1", 0x463B96181691FC9CUL)]
+    [InlineData("rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR b KQkq e3 0 1", 0x823C9B50FD114196UL)]
+    [InlineData("rnbqkbnr/pppppppp/8/8/3pP3/8/PPP1PPPP/RNBQKBNR b KQkq e3 0 1", 0xCB53F9B62DD4E8E2UL)]
+    [InlineData("rnbq1rk1/ppp2ppp/3bpn2/3p4/3P4/2NBPN2/PPP2PPP/R1BQ1RK1 w - - 0 8", 0xDB7D978D401881D9UL)]
+    public void PolyglotHash_ShouldMatchKnownVectors(string fen, ulong expected)
+    {
+        var pos = Fen.Parse(fen);
+
+        Assert.Equal(expected, pos.PolyglotKey);
+        Assert.Equal(expected, Polyglot.ComputeHash(pos));
+    }
+
+    [Fact]
+    public void PolyglotDecodeMove_ShouldNormalizeCastlingSquares()
+    {
+        // e1h1 in Polyglot must become e1g1 in normal move representation.
+        ushort polyCastleKingSide = (ushort)((4 << 6) | 7);
+
+        var move = OpeningBook.DecodeMove(polyCastleKingSide, Color.White);
+
+        Assert.Equal(4, move.From);
+        Assert.Equal(6, move.To);
+    }
+
+    [Fact]
+    public void FindBestMove_WithLoadedBookFromStartPosition_ShouldReturnLegalMove()
+    {
+        EnsureOpeningBookLoaded();
+
+        var pos = Position.CreateStartPosition();
+        var bestMove = Negamax.FindBestMove(pos, depth: 3);
+        var legalMoves = MoveGenerator.GenerateLegalMoves(pos);
+
+        Assert.Contains(bestMove, legalMoves);
+    }
+
+    private static void EnsureOpeningBookLoaded()
+    {
+        if (s_bookLoaded)
+            return;
+
+        lock (s_bookLoadLock)
+        {
+            if (s_bookLoaded)
+                return;
+
+            string baseDir = AppContext.BaseDirectory;
+            string bookPath = Path.GetFullPath(Path.Combine(baseDir, "..", "..", "..", "..", "Engine.Core", "Book", "bins", "Titans.bin"));
+
+            if (!File.Exists(bookPath))
+            {
+                throw new FileNotFoundException($"Could not find opening book at expected path: {bookPath}");
+            }
+
+            OpeningBook.Load(bookPath);
+            s_bookLoaded = true;
+        }
     }
 }

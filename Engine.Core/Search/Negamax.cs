@@ -1,5 +1,6 @@
 using System.Collections.Concurrent;
 using Engine.Core.Board;
+using Engine.Core.Book.bins;
 using Engine.Core.MoveGen;
 using Engine.Core.Moves;
 
@@ -97,7 +98,15 @@ public static class Negamax
 
         return results.OrderByDescending(r => r.score).First().move;
     }
-    
+    public static Move FindBestMove(Position pos, int depth)
+    {
+        var bookMove = OpeningBook.GetBookMove(pos.PolyglotKey, pos.SideToMove);
+
+        if (bookMove != null)
+            return bookMove.Value;
+
+        return GetBestMove(pos, depth);
+    }
     
     public static Move GetBestMove(Position pos, int depth)
     {

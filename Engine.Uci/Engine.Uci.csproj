@@ -5,11 +5,23 @@
         <TargetFramework>net9.0</TargetFramework>
         <ImplicitUsings>enable</ImplicitUsings>
         <Nullable>enable</Nullable>
-        <AssemblyName>Yris-1.1.0</AssemblyName>
+        <AssemblyName>Yris2.0.0</AssemblyName>
     </PropertyGroup>
 
     <ItemGroup>
       <ProjectReference Include="..\Engine.Core\Engine.Core.csproj" />
+    </ItemGroup>
+
+    <ItemGroup>
+      <None Include="bin\Debug\net9.0\Titans.bin" />
+      <None Include="bin\Release\net9.0\Titans.bin" />
+    </ItemGroup>
+
+    <ItemGroup>
+        <None Include="Titans.bin">
+            <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+            <CopyToPublishDirectory>Always</CopyToPublishDirectory>
+        </None>
     </ItemGroup>
 
 </Project>
