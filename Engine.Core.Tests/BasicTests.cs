@@ -185,6 +185,44 @@ public class BasicTests
         Assert.Contains(bestMove, legalMoves);
     }
 
+    [Fact]
+    public void GetBestMove_FromStartDepth1_ShouldPreferPrincipledOpeningMove()
+    {
+        var pos = Position.CreateStartPosition();
+
+        var bestMove = Negamax.GetBestMove(pos, depth: 1);
+
+        var preferredMoves = new HashSet<Move>
+        {
+            new(12, 28), // e2e4
+            new(11, 27), // d2d4
+            new(12, 20), // e2e3
+            new(11, 19), // d2d3
+            new(10, 26), // c2c4
+            new(10, 18), // c2c3
+            new(6, 21),  // g1f3
+            new(1, 18)   // b1c3
+        };
+
+        var antiPrincipledMoves = new HashSet<Move>
+        {
+            new(3, 11),  // Qd1d2
+            new(3, 19),  // Qd1d3
+            new(3, 27),  // Qd1d4
+            new(8, 16),  // a2a3
+            new(8, 24),  // a2a4
+            new(9, 17),  // b2b3
+            new(9, 25),  // b2b4
+            new(14, 22), // g2g3
+            new(14, 30), // g2g4
+            new(15, 23), // h2h3
+            new(15, 31)  // h2h4
+        };
+
+        Assert.Contains(bestMove, preferredMoves);
+        Assert.DoesNotContain(bestMove, antiPrincipledMoves);
+    }
+
     private static void EnsureOpeningBookLoaded()
     {
         if (s_bookLoaded)

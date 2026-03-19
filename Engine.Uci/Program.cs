@@ -5,7 +5,7 @@ using Engine.Core.Search;
 using Engine.Uci;
 
 Position position = new Position();
-BookLoader.LoadFromEmbedded();
+// BookLoader.LoadFromEmbedded();
 var depth = 5;
 Color engineColor = Color.White;
 
@@ -85,7 +85,7 @@ while (true)
         }
 
         TimeManager.StartSearch(allocatedTimeMs);
-        var bestMove = Negamax.FindBestMove(position, depth: searchDepth);
+        var bestMove = Negamax.GetBestMove(position, depth: searchDepth);
         Console.WriteLine($"bestmove {bestMove.ToUci()}");
     }
 

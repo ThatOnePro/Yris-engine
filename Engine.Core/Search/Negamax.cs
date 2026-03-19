@@ -86,6 +86,7 @@ public static class Negamax
             
                 // Gebruik stabiele integers voor Alpha/Beta om overflows te voorkomen
                 double score = -NegamaxScore(threadSpecificPos, depth - 1, -1000000, 1000000, 1);
+                score += GetOpeningRootBias(pos, moveWrap.Move);
             
                 threadSpecificPos.UndoMove();
                 results.Add((moveWrap.Move, score));
@@ -131,9 +132,11 @@ public static class Negamax
                 break;
             }
 
+            int openingBias = GetOpeningRootBias(pos, scoredMove.Move);
             pos.MakeMove(scoredMove.Move);
 
             int boardValue = -NegamaxScore(pos, depth - 1, -beta, -alpha, 1);
+            boardValue += openingBias;
 
             pos.UndoMove();
 
@@ -147,6 +150,71 @@ public static class Negamax
         }
 
         return bestMove;
+    }
+
+    private static int GetOpeningRootBias(Position pos, Move move)
+    {
+        if (pos.FullmoveNumber > 12)
+            return 0;
+
+        int bonus = 0;
+        Piece movingPiece = pos.Squares[move.From];
+
+        if (IsCastleMove(movingPiece, move))
+            bonus += 30;
+
+        if (IsMainCenter(move.To))
+            bonus += 20;
+        else if (IsExtendedCenter(move.To))
+            bonus += 10;
+
+        if (IsMinorPiece(movingPiece) && IsHomeMinorSquare(movingPiece, move.From))
+            bonus += 14;
+
+        if (movingPiece == Piece.WQ || movingPiece == Piece.BQ)
+        {
+            if (pos.FullmoveNumber <= 8)
+                bonus -= 20;
+        }
+
+        if (movingPiece == Piece.WP || movingPiece == Piece.BP)
+        {
+            int toFile = move.To % 8;
+            bool flankPawnPush = toFile is 0 or 1 or 6 or 7;
+            if (flankPawnPush && pos.FullmoveNumber <= 6)
+                bonus -= 10;
+        }
+
+        return bonus;
+    }
+
+    private static bool IsCastleMove(Piece movingPiece, Move move)
+    {
+        return (movingPiece == Piece.WK && move.From == 4 && (move.To == 6 || move.To == 2)) ||
+               (movingPiece == Piece.BK && move.From == 60 && (move.To == 62 || move.To == 58));
+    }
+
+    private static bool IsMinorPiece(Piece piece)
+    {
+        return piece is Piece.WN or Piece.BN or Piece.WB or Piece.BB;
+    }
+
+    private static bool IsHomeMinorSquare(Piece piece, int from)
+    {
+        return (piece == Piece.WN && (from == 1 || from == 6)) ||
+               (piece == Piece.BN && (from == 57 || from == 62)) ||
+               (piece == Piece.WB && (from == 2 || from == 5)) ||
+               (piece == Piece.BB && (from == 58 || from == 61));
+    }
+
+    private static bool IsMainCenter(int square)
+    {
+        return square is 27 or 28 or 35 or 36;
+    }
+
+    private static bool IsExtendedCenter(int square)
+    {
+        return square is 18 or 19 or 20 or 21 or 26 or 29 or 34 or 37 or 42 or 43 or 44 or 45;
     }
 
     private static int NegamaxScore(Position pos, int depth, int alpha, int beta, int ply)
