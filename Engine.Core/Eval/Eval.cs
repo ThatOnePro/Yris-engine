@@ -175,10 +175,7 @@ public static class Eval
         Piece.WQ or Piece.BQ => PhaseQueen,
         _ => 0
     };
-
-    // -------------------
-    // Pawn structure eval
-    // -------------------
+    
     private static int EvaluatePawnStructure(Position position)
     {
         Span<int> whiteFiles = stackalloc int[8];
@@ -194,8 +191,7 @@ public static class Eval
         }
 
         int score = 0;
-
-        // Doubled and isolated pawns
+        
         for (int f = 0; f < 8; f++)
         {
             // Doubled pawns
