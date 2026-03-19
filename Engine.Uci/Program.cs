@@ -116,11 +116,8 @@ while (true)
         {
             if (localPerftDepth > 0)
             {
-                var sw = System.Diagnostics.Stopwatch.StartNew();
-                long nodes = Perft.Run(searchPos, localPerftDepth);
-                sw.Stop();
-                long nps = sw.ElapsedMilliseconds > 0 ? nodes * 1000 / sw.ElapsedMilliseconds : 0;
-                Console.WriteLine($"info nodes {nodes} time {sw.ElapsedMilliseconds} nps {nps}");
+                var result = Perft.Benchmark(searchPos, localPerftDepth);
+                Console.WriteLine($"info nodes {result.Nodes} time {result.ElapsedMilliseconds} nps {result.Nps}");
                 Console.WriteLine("bestmove 0000");
                 return;
             }
@@ -154,6 +151,62 @@ while (true)
             string bestMoveStr = bestMove == default ? "0000" : bestMove.ToUci();
             Console.WriteLine($"bestmove {bestMoveStr}");
         });
+    }
+
+    else if (command.StartsWith("bench"))
+    {
+        TimeManager.Stop();
+        searchTask?.Wait(500);
+
+        int depth = 10;
+        var parts = command.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+
+        if (parts.Length > 1 && !int.TryParse(parts[1], out depth))
+        {
+            Console.WriteLine("info string usage: bench [depth]");
+            continue;
+        }
+
+        if (depth < 1)
+        {
+            Console.WriteLine("info string bench requires depth >= 1");
+            continue;
+        }
+
+        var benchmarkFens = new[]
+        {
+            "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1",
+            "r3k2r/p1ppqpb1/bn2pnp1/3PN3/1p2P3/2N2Q1p/PPPBBPPP/R3K2R w KQkq - 0 1",
+            "8/2p5/3p4/KP5r/1R3p1k/8/4P1P1/8 w - - 0 1",
+            "rnbqkb1r/pp1p1ppp/2p5/4p3/2B1P3/5N2/PPPP1PPP/RNBQK2R w KQkq - 0 1",
+            "r1bqkbnr/pppp1ppp/2n5/1B2p3/4P3/5N2/PPPP1PPP/RNBQK2R w KQkq - 0 1",
+        };
+
+        long totalNodes = 0;
+        long totalMs = 0;
+
+        Console.WriteLine($"info string Starting bench at depth {depth}");
+
+        for (int i = 0; i < benchmarkFens.Length; i++)
+        {
+            var benchPos = Fen.Parse(benchmarkFens[i]);
+            
+            // Initialize TimeManager for this position's search
+            TimeManager.StartSearch(long.MaxValue);
+            
+            var sw = System.Diagnostics.Stopwatch.StartNew();
+            var searchResult = Negamax.GetBestMove(benchPos, depth);
+            sw.Stop();
+
+            long nps = sw.ElapsedMilliseconds > 0 ? searchResult.Nodes * 1000 / sw.ElapsedMilliseconds : 0;
+            totalNodes += searchResult.Nodes;
+            totalMs += sw.ElapsedMilliseconds;
+
+            Console.WriteLine($"info string bench position {i + 1}/5 nodes {searchResult.Nodes} time {sw.ElapsedMilliseconds} nps {nps}");
+        }
+
+        long avgNps = totalMs > 0 ? totalNodes * 1000 / totalMs : 0;
+        Console.WriteLine($"info string bench done depth {depth} totalNodes {totalNodes} totalTime {totalMs} avgNps {avgNps}");
     }
 
     else if (command == "stop")

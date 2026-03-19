@@ -1,4 +1,5 @@
 using Engine.Core.Board;
+using Engine.Core.MoveGen;
 using Engine.Core.Moves;
 using Engine.Core.Search;
 
@@ -33,10 +34,10 @@ public class BasicTests
     {
         var pos = Fen.Parse("rnbqkbnr/ppp2p1p/3p2p1/4p2Q/2B1P3/3P4/PPP2PPP/RNB1K1NR b KQkq - 0 4");
 
-        var bestMove = Negamax.GetBestMove(pos, 3);
-        var legalMoves = Engine.Core.MoveGen.MoveGenerator.GenerateLegalMoves(pos);
+        var searchResult = Negamax.GetBestMove(pos, 3);
+        var legalMoves = MoveGenerator.GenerateLegalMoves(pos);
 
-        Assert.Contains(bestMove, legalMoves);
+        Assert.Contains(searchResult.BestMove, legalMoves);
     }
 
     [Fact]
