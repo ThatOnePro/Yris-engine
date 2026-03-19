@@ -3,8 +3,8 @@ using Engine.Core.Moves;
 using Engine.Core.Search;
 
 Position position = new Position();
-var depth = 5;
 Color engineColor = Color.White;
+Task? searchTask = null;
 
 while (true)
 {
@@ -15,6 +15,8 @@ while (true)
     {
         Console.WriteLine("id name Yris-Engine");
         Console.WriteLine("id author Axel Peeters, Lars Peleman, Jan Van Herck");
+        Console.WriteLine("option name Hash type spin default 16 min 1 max 1024");
+        Console.WriteLine("option name Threads type spin default 1 min 1 max 1");
         Console.WriteLine("uciok");
     }
 
@@ -25,6 +27,8 @@ while (true)
 
     else if (command == "ucinewgame")
     {
+        TimeManager.Stop();
+        searchTask?.Wait(500);
         position = new Position();
         TranspositionTable.Clear();
     }
@@ -36,73 +40,133 @@ while (true)
 
     else if (command.StartsWith("go"))
     {
-        int searchDepth = depth;
-        long allocatedTimeMs = 1000; // default 1 second
-        
+        // Stop any running search first
+        TimeManager.Stop();
+        searchTask?.Wait(500);
+
+        int maxDepth = 6;
+        long allocatedTimeMs = -1;
+        bool infinite = false;
+        bool movetime = false;
+        int perftDepth = -1;
+
         var parts = command.Split(' ', StringSplitOptions.RemoveEmptyEntries);
         for (int i = 1; i < parts.Length; i++)
         {
-            if (parts[i] == "depth" && i + 1 < parts.Length && int.TryParse(parts[i + 1], out var d))
+            if (parts[i] == "infinite")
             {
-                searchDepth = d;
+                infinite = true;
+            }
+            else if (parts[i] == "perft" && i + 1 < parts.Length && int.TryParse(parts[i + 1], out var pd))
+            {
+                perftDepth = pd;
+                i++;
+            }
+            else if (parts[i] == "depth" && i + 1 < parts.Length && int.TryParse(parts[i + 1], out var d))
+            {
+                maxDepth = d;
+                i++;
             }
             else if (parts[i] == "movetime" && i + 1 < parts.Length && long.TryParse(parts[i + 1], out var mt))
             {
                 allocatedTimeMs = mt;
+                movetime = true;
+                i++;
             }
             else if (parts[i] == "wtime" && i + 1 < parts.Length && long.TryParse(parts[i + 1], out var wt))
             {
-                if (engineColor == Color.White)
-                {
-                    // Use 1/40th of remaining time + 1 second increment if provided
+                if (engineColor == Color.White && !movetime && allocatedTimeMs < 0)
                     allocatedTimeMs = Math.Max(10, wt / 40);
-                }
+                i++;
             }
             else if (parts[i] == "btime" && i + 1 < parts.Length && long.TryParse(parts[i + 1], out var bt))
             {
-                if (engineColor == Color.Black)
-                {
+                if (engineColor == Color.Black && !movetime && allocatedTimeMs < 0)
                     allocatedTimeMs = Math.Max(10, bt / 40);
-                }
+                i++;
             }
             else if (parts[i] == "winc" && i + 1 < parts.Length && long.TryParse(parts[i + 1], out var wi))
             {
-                if (engineColor == Color.White)
-                {
-                    allocatedTimeMs += wi;
-                }
+                if (engineColor == Color.White && !movetime)
+                    allocatedTimeMs = allocatedTimeMs < 0 ? wi / 2 : allocatedTimeMs + wi / 2;
+                i++;
             }
             else if (parts[i] == "binc" && i + 1 < parts.Length && long.TryParse(parts[i + 1], out var bi))
             {
-                if (engineColor == Color.Black)
-                {
-                    allocatedTimeMs += bi;
-                }
+                if (engineColor == Color.Black && !movetime)
+                    allocatedTimeMs = allocatedTimeMs < 0 ? bi / 2 : allocatedTimeMs + bi / 2;
+                i++;
+            }
+            else if (parts[i] == "movestogo" && i + 1 < parts.Length)
+            {
+                // consumed but not used (already handled by wtime/btime division)
+                i++;
             }
         }
 
-        TimeManager.StartSearch(allocatedTimeMs);
-        var bestMove = Negamax.GetBestMove(position, depth: searchDepth);
-        Console.WriteLine($"bestmove {bestMove.ToUci()}");
+        if (infinite || allocatedTimeMs < 0)
+            allocatedTimeMs = long.MaxValue;
+
+        var searchPos = position.Clone();
+        int localMaxDepth = maxDepth;
+        long localTimeMs = allocatedTimeMs;
+        int localPerftDepth = perftDepth;
+
+        searchTask = Task.Run(() =>
+        {
+            if (localPerftDepth > 0)
+            {
+                var sw = System.Diagnostics.Stopwatch.StartNew();
+                long nodes = Perft.Run(searchPos, localPerftDepth);
+                sw.Stop();
+                long nps = sw.ElapsedMilliseconds > 0 ? nodes * 1000 / sw.ElapsedMilliseconds : 0;
+                Console.WriteLine($"info nodes {nodes} time {sw.ElapsedMilliseconds} nps {nps}");
+                Console.WriteLine("bestmove 0000");
+                return;
+            }
+
+            TimeManager.StartSearch(localTimeMs);
+
+            Move bestMove = default;
+            int bestScore = 0;
+
+            for (int d = 1; d <= localMaxDepth; d++)
+            {
+                if (TimeManager.TimeExpired) break;
+
+                var result = Negamax.GetBestMove(searchPos, d);
+
+                // Only commit result if depth completed fully (or it's the first depth)
+                bool completed = !TimeManager.TimeExpired || d == 1;
+                if (completed)
+                {
+                    bestMove = result.BestMove;
+                    bestScore = result.Score;
+
+                    long elapsed = Math.Max(1, TimeManager.GetElapsedMs());
+                    long nps = result.Nodes * 1000 / elapsed;
+                    string scoreStr = FormatScore(bestScore);
+                    string pvStr = bestMove == default ? "0000" : bestMove.ToUci();
+                    Console.WriteLine($"info depth {d} score {scoreStr} nodes {result.Nodes} time {elapsed} nps {nps} pv {pvStr}");
+                }
+            }
+
+            string bestMoveStr = bestMove == default ? "0000" : bestMove.ToUci();
+            Console.WriteLine($"bestmove {bestMoveStr}");
+        });
     }
 
     else if (command == "stop")
     {
-        // ignore for now
+        TimeManager.Stop();
+        searchTask?.Wait(500);
     }
 
     else if (command == "quit")
     {
+        TimeManager.Stop();
+        searchTask?.Wait(500);
         break;
-    }
-
-    else if (command.StartsWith("depth"))
-    {
-        var parts = command.Split(' ', StringSplitOptions.RemoveEmptyEntries);
-        if (parts.Length >= 2 && int.TryParse(parts[1], out var newDepth) && newDepth > 0)
-        {
-            depth = newDepth;
-        }
     }
 }
 
@@ -129,7 +193,6 @@ static void ParsePosition(string command, ref Position pos, ref Color engineColo
     if (index < parts.Length && parts[index] == "moves")
     {
         index++;
-
         for (int i = index; i < parts.Length; i++)
         {
             Move move = MoveParser.FromUci(pos, parts[i]);
@@ -137,60 +200,25 @@ static void ParsePosition(string command, ref Position pos, ref Color engineColo
         }
     }
 
-    // Update engine color based on side to move
     engineColor = pos.SideToMove;
 }
 
-// var move = Negamax.GetBestMove(Fen.Parse("rnbqkbnr/ppp2p1p/3p2p1/4p2Q/2B1P3/3P4/PPP2PPP/RNB1K1NR b KQkq - 0 4"), 4);
-// Console.WriteLine($"{move.ToUci()}");
+static string FormatScore(int score)
+{
+    const int MateScore = 100000;
+    const int MateThreshold = 99000;
 
-// var tests = new List<PerftTest>
-// {
-//     new("Initial Position",
-//         "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1",
-//         new long[] {20, 400, 8902, 197281, 4865609}),
-//
-//     new("Kiwipete",
-//         "r3k2r/p1ppqpb1/bn2pnp1/3PN3/1p2P3/2N2Q1p/PPPBBPPP/R3K2R w KQkq - 0 1",
-//         new long[] {48, 2039, 97862, 4085603}),
-//
-//     new("Position 3",
-//         "8/2p5/3p4/KP5r/1R3p1k/8/4P1P1/8 w - - 0 1",
-//         new long[] {14, 191, 2812, 43238, 674624}),
-//
-//     new("Position 4",
-//         "r3k2r/Pppp1ppp/1b3nbN/nP6/BBP1P3/q4N2/Pp1P2PP/R2Q1RK1 w kq - 0 1",
-//         new long[] {6, 264, 9467, 422333, 15833292}),
-//
-//     new("Position 5",
-//         "rnbq1k1r/pp1Pbppp/2p5/8/2B5/8/PPP1NnPP/RNBQK2R w KQ - 1 8",
-//         new long[] {44, 1486, 62379, 2103487}),
-//
-//     new("Position 6",
-//         "r4rk1/1pp1qppp/p1np1n2/2b1p1B1/2B1P1b1/P1NP1N2/1PP1QPPP/R4RK1 w - - 0 10",
-//         new long[] {46, 2079, 89890, 3894594})
-// };
-//
-// foreach (var test in tests)
-// {
-//     Console.WriteLine($"===== {test.Name} =====");
-//
-//     var position = Fen.Parse(test.Fen);
-//
-//     for (int depth = 1; depth <= test.Expected.Length; depth++)
-//     {
-//         var result = Perft.Run(position, depth);
-//         var expected = test.Expected[depth - 1];
-//
-//         var status = result == expected ? "PASS" : "FAIL";
-//
-//         Console.WriteLine(
-//             $"Depth {depth,-2} | Result: {result,-10} | Expected: {expected,-10} | {status}");
-//     }
-//
-//     Console.WriteLine();
-// }
-//
-// Perft.Divide(Fen.Parse(tests[1].Fen), 3);
-// public record PerftTest(string Name, string Fen, long[] Expected);
-
+    if (score >= MateThreshold)
+    {
+        int plies = MateScore - score;
+        int moves = (plies + 1) / 2;
+        return $"mate {moves}";
+    }
+    if (score <= -MateThreshold)
+    {
+        int plies = MateScore + score;
+        int moves = (plies + 1) / 2;
+        return $"mate -{moves}";
+    }
+    return $"cp {score}";
+}
