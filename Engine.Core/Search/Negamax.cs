@@ -5,6 +5,8 @@ using Engine.Core.Moves;
 
 namespace Engine.Core.Search;
 
+public record struct SearchResult(Move BestMove, int Score, long Nodes);
+
 public static class Negamax
 {
     private const int MateScore = 100000;
@@ -99,7 +101,7 @@ public static class Negamax
     }
     
     
-    public static Move GetBestMove(Position pos, int depth)
+    public static SearchResult GetBestMove(Position pos, int depth)
     {
         int alpha = int.MinValue + 1;
         int beta = int.MaxValue;
@@ -107,9 +109,7 @@ public static class Negamax
 
         var moves = MoveGenerator.GenerateLegalMoves(pos);
         if (moves.Count == 0)
-        {
-            return default;
-        }
+            return new SearchResult(default, 0, TimeManager.TotalNodes);
 
         Move bestMove = moves[0];
         var orderedMoves = OrderMoves(pos, moves);
@@ -117,14 +117,10 @@ public static class Negamax
         foreach (var scoredMove in orderedMoves)
         {
             if (TimeManager.TimeExpired)
-            {
                 break;
-            }
 
             pos.MakeMove(scoredMove.Move);
-
             int boardValue = -NegamaxScore(pos, depth - 1, -beta, -alpha, 1);
-
             pos.UndoMove();
 
             if (boardValue > bestValue)
@@ -136,7 +132,7 @@ public static class Negamax
             alpha = Math.Max(alpha, bestValue);
         }
 
-        return bestMove;
+        return new SearchResult(bestMove, bestValue, TimeManager.TotalNodes);
     }
 
     private static int NegamaxScore(Position pos, int depth, int alpha, int beta, int ply)
