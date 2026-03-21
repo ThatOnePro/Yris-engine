@@ -304,18 +304,25 @@ public sealed class Position
     
     public Position Clone()
     {
-        return new Position
+        var clone = new Position
         {
-            // Belangrijk: Maak een NIEUWE array en kopieer de inhoud
-            // Gebruik Array.Copy of .ToArray() voor snelheid
-            Squares = (Piece[])this.Squares.Clone(),
-            
-            // Value types (int, enum, ulong) worden automatisch gekopieerd
-            SideToMove = this.SideToMove,
-            Castling = this.Castling,
-            EnPassantSquare = this.EnPassantSquare,
-            ZobristKey = this.ZobristKey
+            Squares = (Piece[])Squares.Clone(),
+            SideToMove = SideToMove,
+            Castling = Castling,
+            EnPassantSquare = EnPassantSquare,
+            ZobristKey = ZobristKey,
+            HalfmoveClock = HalfmoveClock,
+            FullmoveNumber = FullmoveNumber,
         };
+
+        // Preserve stack order (oldest -> newest push) so top-of-stack matches original.
+        var history = _history.ToArray();
+        for (int i = history.Length - 1; i >= 0; i--)
+        {
+            clone._history.Push(history[i]);
+        }
+
+        return clone;
     }
 
 
