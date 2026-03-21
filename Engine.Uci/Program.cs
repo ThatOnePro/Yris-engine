@@ -44,7 +44,7 @@ while (true)
         TimeManager.Stop();
         searchTask?.Wait(500);
 
-        int maxDepth = 7;
+        int maxDepth = 10;
         long allocatedTimeMs = -1;
         bool infinite = false;
         bool movetime = false;
