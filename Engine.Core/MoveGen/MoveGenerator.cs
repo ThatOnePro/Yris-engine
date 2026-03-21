@@ -7,6 +7,16 @@ public static class MoveGenerator
 {
     public static List<Move> GeneratePseudoLegalMoves(Position pos)
     {
+        return GeneratePseudoLegalMoves(pos, capturesOnly: false);
+    }
+
+    public static List<Move> GeneratePseudoLegalCaptures(Position pos)
+    {
+        return GeneratePseudoLegalMoves(pos, capturesOnly: true);
+    }
+
+    private static List<Move> GeneratePseudoLegalMoves(Position pos, bool capturesOnly)
+    {
         var moves = new List<Move>(64);
 
         for (int from = 0; from < 64; from++)
@@ -21,33 +31,33 @@ public static class MoveGenerator
             {
                 case Piece.WN:
                 case Piece.BN:
-                    AddKnightMoves(pos, from, piece, moves);
+                    AddKnightMoves(pos, from, piece, moves, capturesOnly);
                     break;
 
                 case Piece.WP:
                 case Piece.BP:
-                    AddPawnMoves(pos, from, piece, moves);
+                    AddPawnMoves(pos, from, piece, moves, capturesOnly);
                     break;
 
                 case Piece.WB:
                 case Piece.BB:
-                    AddSlidingMoves(pos, from, piece, moves, BishopDirections);
+                    AddSlidingMoves(pos, from, piece, moves, BishopDirections, capturesOnly);
                     break;
 
                 case Piece.WR:
                 case Piece.BR:
-                    AddSlidingMoves(pos, from, piece, moves, RookDirections);
+                    AddSlidingMoves(pos, from, piece, moves, RookDirections, capturesOnly);
                     break;
 
                 case Piece.WQ:
                 case Piece.BQ:
-                    AddSlidingMoves(pos, from, piece, moves, BishopDirections);
-                    AddSlidingMoves(pos, from, piece, moves, RookDirections);
+                    AddSlidingMoves(pos, from, piece, moves, BishopDirections, capturesOnly);
+                    AddSlidingMoves(pos, from, piece, moves, RookDirections, capturesOnly);
                     break;
 
                 case Piece.WK:
                 case Piece.BK:
-                    AddKingMoves(pos, from, piece, moves);
+                    AddKingMoves(pos, from, piece, moves, capturesOnly);
                     break;
             }
         }
@@ -73,6 +83,22 @@ public static class MoveGenerator
         return legal;
     }
 
+    public static List<Move> GenerateLegalCaptures(Position pos)
+    {
+        var pseudo = MoveGenerator.GeneratePseudoLegalCaptures(pos);
+        var legal = new List<Move>();
+
+        foreach (var move in pseudo)
+        {
+            if (IsMoveLegal(pos, move))
+            {
+                legal.Add(move);
+            }
+        }
+
+        return legal;
+    }
+
     private static bool IsMoveLegal(Position pos, Move move)
     {
         // Gebruik hier een TIJDELIJKE kopie of een hele lichte check
@@ -84,7 +110,7 @@ public static class MoveGenerator
     
     private static readonly int[] KnightOffsets = { -17, -15, -10, -6, 6, 10, 15, 17 };
 
-    private static void AddKnightMoves(Position pos, int from, Piece piece, List<Move> moves)
+    private static void AddKnightMoves(Position pos, int from, Piece piece, List<Move> moves, bool capturesOnly)
     {
         int fromFile = from % 8;
         int fromRank = from / 8;
@@ -100,12 +126,13 @@ public static class MoveGenerator
             if (Math.Abs(fromFile - toFile) > 2 || Math.Abs(fromRank - toRank) > 2) continue;
 
             var target = pos.Squares[to];
-            if (target == Piece.None || (piece.IsWhite() && target.IsBlack()) || (piece.IsBlack() && target.IsWhite()))
+            bool isCapture = (piece.IsWhite() && target.IsBlack()) || (piece.IsBlack() && target.IsWhite());
+            if (isCapture || (!capturesOnly && target == Piece.None))
                 moves.Add(new Move(from, to));
         }
     }
 
-    private static void AddPawnMoves(Position pos, int from, Piece piece, List<Move> moves)
+    private static void AddPawnMoves(Position pos, int from, Piece piece, List<Move> moves, bool capturesOnly)
     {
         bool white = piece.IsWhite();
         int dir = white ? 8 : -8;
@@ -116,7 +143,7 @@ public static class MoveGenerator
         int fromFile = from % 8;
 
         int one = from + dir;
-        if (one is >= 0 and < 64 && pos.Squares[one] == Piece.None)
+        if (!capturesOnly && one is >= 0 and < 64 && pos.Squares[one] == Piece.None)
         {
             if (fromRank == promotionRank) AddPromotionMoves(from, one, white, moves);
             else
@@ -163,7 +190,7 @@ public static class MoveGenerator
     private static readonly int[] BishopDirections = { -9, -7, 7, 9 };
     private static readonly int[] RookDirections   = { -8, -1, 1, 8 };
     
-    private static void AddSlidingMoves(Position pos, int from, Piece piece, List<Move> moves, int[] directions)
+    private static void AddSlidingMoves(Position pos, int from, Piece piece, List<Move> moves, int[] directions, bool capturesOnly)
     {
         bool white = piece.IsWhite();
         int fromFile = from % 8;
@@ -193,7 +220,8 @@ public static class MoveGenerator
 
                 if (target == Piece.None)
                 {
-                    moves.Add(new Move(from, next));
+                    if (!capturesOnly)
+                        moves.Add(new Move(from, next));
                 }
                 else
                 {
@@ -215,7 +243,7 @@ public static class MoveGenerator
         7,  8,  9
     };
 
-    private static void AddKingMoves(Position pos, int from, Piece piece, List<Move> moves)
+    private static void AddKingMoves(Position pos, int from, Piece piece, List<Move> moves, bool capturesOnly)
     {
         bool white = piece.IsWhite();
         int fromFile = from % 8;
@@ -232,16 +260,16 @@ public static class MoveGenerator
                 continue;
 
             var target = pos.Squares[to];
+            bool isCapture = (white && target.IsBlack()) || (!white && target.IsWhite());
 
-            if (target == Piece.None ||
-                (white && target.IsBlack()) ||
-                (!white && target.IsWhite()))
+            if (isCapture || (!capturesOnly && target == Piece.None))
             {
                 moves.Add(new Move(from, to));
             }
         }
 
-        AddCastlingMoves(pos, from, piece, moves);
+        if (!capturesOnly)
+            AddCastlingMoves(pos, from, piece, moves);
     }
 
     private static void AddCastlingMoves(Position pos, int from, Piece piece, List<Move> moves)
