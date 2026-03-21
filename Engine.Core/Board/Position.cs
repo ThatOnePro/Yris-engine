@@ -270,6 +270,83 @@ public sealed class Position
 
         ZobristKey = undo.ZobristKey;
     }
+    
+    // ============================================================
+// ADD THESE THREE METHODS TO YOUR EXISTING Position CLASS
+// ============================================================
+
+// Place these alongside MakeMove / UndoMove in Position.cs.
+
+/// <summary>
+/// Returns true when the side to move has at least one non-pawn, non-king piece.
+/// Used to guard null-move pruning against zugzwang in KP-vs-K endings.
+/// </summary>
+public bool HasNonPawnMaterial()
+{
+    for (int sq = 0; sq < 64; sq++)
+    {
+        var p = Squares[sq];
+        if (p == Piece.None) continue;
+
+        if (SideToMove == Color.White)
+        {
+            if (p == Piece.WN || p == Piece.WB || p == Piece.WR || p == Piece.WQ)
+                return true;
+        }
+        else
+        {
+            if (p == Piece.BN || p == Piece.BB || p == Piece.BR || p == Piece.BQ)
+                return true;
+        }
+    }
+    return false;
+}
+
+/// <summary>
+/// Makes a null move: passes the turn without moving a piece.
+/// Updates the Zobrist key and clears the en-passant square.
+/// </summary>
+public void MakeNullMove()
+{
+    // Push a state so UndoNullMove can restore everything.
+    _history.Push(new UndoState(
+        default,        // no real move
+        Piece.None,     // no captured piece
+        EnPassantSquare,
+        Castling,
+        HalfmoveClock,
+        FullmoveNumber,
+        ZobristKey
+    ));
+
+    // Remove en-passant from hash before clearing it.
+    if (EnPassantSquare != -1)
+        ZobristKey ^= Zobrist.EnPassantKeys[EnPassantSquare];
+
+    EnPassantSquare = -1;
+    HalfmoveClock++;
+
+    if (SideToMove == Color.Black) FullmoveNumber++;
+
+    SideToMove  =  SideToMove.Opposite();
+    ZobristKey  ^= Zobrist.SideKey;
+}
+
+/// <summary>Undoes a null move made by MakeNullMove.</summary>
+public void UndoNullMove()
+{
+    var state = _history.Pop();
+
+    SideToMove = SideToMove.Opposite();
+
+    if (SideToMove == Color.Black) FullmoveNumber--;
+
+    EnPassantSquare = state.EnPassantSquare;
+    HalfmoveClock   = state.HalfMoveClock;
+    FullmoveNumber   = state.FullMoveNumber;
+    ZobristKey       = state.ZobristKey;
+    // Castling rights are not affected by a null move – no need to restore.
+}
 
     public bool IsThreefoldRepetition()
     {

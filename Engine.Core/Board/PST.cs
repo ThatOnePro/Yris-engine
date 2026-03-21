@@ -85,6 +85,19 @@ public static class PST
         -30,-20,-10,-10,-10,-10,-20,-30,
         -50,-40,-30,-20,-20,-30,-40,-50
     };
+    
+    public static readonly int[] PawnEndgame = new int[64]
+    {
+        0,  0,  0,  0,  0,  0,  0,  0,   // rank 1 (white home) – pawns never here at eval
+        5,  5,  5,  5,  5,  5,  5,  5,   // rank 2
+        10, 10, 10, 10, 10, 10, 10, 10,   // rank 3
+        20, 20, 20, 20, 20, 20, 20, 20,   // rank 4
+        35, 35, 35, 35, 35, 35, 35, 35,   // rank 5
+        55, 55, 55, 55, 55, 55, 55, 55,   // rank 6
+        80, 80, 80, 80, 80, 80, 80, 80,   // rank 7 – one step from promotion
+        0,  0,  0,  0,  0,  0,  0,  0    // rank 8 – promotion square
+    };
+
 
     public static int Mirror(int sq) => sq ^ 56;
 }

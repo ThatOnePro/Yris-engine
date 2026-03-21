@@ -127,6 +127,7 @@ while (true)
             Move bestMove = default;
             int bestScore = 0;
 
+            Negamax.PrepareSearch();   // <-- ADD THIS
             for (int d = 1; d <= localMaxDepth; d++)
             {
                 if (TimeManager.TimeExpired) break;

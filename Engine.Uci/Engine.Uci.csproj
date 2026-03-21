@@ -5,7 +5,7 @@
         <TargetFramework>net9.0</TargetFramework>
         <ImplicitUsings>enable</ImplicitUsings>
         <Nullable>enable</Nullable>
-        <AssemblyName>Yris1.2.4</AssemblyName>
+        <AssemblyName>Yris1.2.9</AssemblyName>
     </PropertyGroup>
 
     <ItemGroup>
