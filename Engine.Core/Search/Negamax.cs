@@ -251,12 +251,14 @@ public static class Negamax
             }
         }
 
-        var moves = inCheck
-            ? OrderMoves(pos, MoveGenerator.GenerateLegalMoves(pos))
-            : OrderMoves(pos, MoveGenerator.GenerateLegalCaptures(pos));
+        var moves = OrderMoves(pos, MoveGenerator.GenerateLegalMoves(pos));
 
         foreach (var scoredMove in moves)
         {
+            if (!inCheck &&
+                pos.Squares[scoredMove.Move.To] == 0 &&
+                scoredMove.Move.Promotion == 0)
+                continue;
 
             pos.MakeMove(scoredMove.Move);
 
